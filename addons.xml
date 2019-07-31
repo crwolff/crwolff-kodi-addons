@@ -1,68 +1,9 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <addons>
-<addon
-  id="skin.pandoki"
-  version="0.0.1"
-  name="Pandoki Skin"
-  provider-name="me">
-  <requires>
-    <import addon="xbmc.gui" version="5.10.0"/>
-  </requires>
-  <extension
-    point="xbmc.gui.skin"
-    debugging="false"
-    effectslowdown="1.0">
-    <res width="1280" height="720" aspect="16:9" default="true" folder="720p" />
-  </extension>
-  <extension point="xbmc.addon.metadata">
-    <summary lang="en_US">Confluence skin by Jezz_X. (Kodi's default skin)</summary>
-    <description lang="en_US">Confluence is the default skin for Kodi 9.11 and above. It is a combination of concepts from many popular skins, and attempts to embrace and integrate their good ideas into a skin that should be easy for first time Kodi users to understand and use.</description>
-    <disclaimer lang="en_US">Confluence is the default skin for Kodi, removing it may cause issues</disclaimer>
-    <platform>all</platform>
-  </extension>
-</addon>
-
-<addon id="repository.gomioa" name="gominoa's XBMC Addons" version="0.1.0" provider-name="gominoa">
-	<extension point="xbmc.addon.repository" name="gominoa's XBMC Addon Repository">
-		<info compressed="false">http://raw.github.com/gominoa/gominoa-xbmc-addons/master/addons.xml</info>
-		<checksum>http://raw.github.com/gominoa/gominoa-xbmc-addons/master/addons.xml.md5</checksum>
-		<datadir zip="true">http://raw.github.com/gominoa/gominoa-xbmc-addons/master/repo</datadir>
-	</extension>
-	<extension point="xbmc.addon.metadata">
-		<summary lang="en">Install gominoa's Addons</summary>
-		<description lang="en">Download and install addons by gominoa</description>
-		<platform>all</platform>
-	</extension>
-</addon>
-
-<addon id="plugin.audio.pandoraslim"
-    name="Pandora Slim"
-    version="0.4.2"
-    provider-name="gominoa">
-    <requires>
-        <import addon="xbmc.python" version="2.1.0"/>
-    </requires>
-    <extension point="xbmc.python.pluginsource" library="default.py">
-        <provides>audio</provides>
-    </extension>
-    <extension point="xbmc.addon.metadata">
-	<summary lang="en">Pandora Internet Radio (Player Only)</summary>
-	<description lang="en">Pandora Internet Radio (Player Only)</description>
-	<disclaimer lang="en">Ain't my fault</disclaimer>
-	<language></language>
-	<platform>all</platform>
-	<license>GNU GENERAL PUBLIC LICENSE Version 3, 29 June 2007</license>
-	<forum>http://forum.xbmc.org/showthread.php?tid=205547</forum>
-	<website></website>
-	<email></email>
-	<source>https://github.com/gominoa/gominoa-xbmc-addons</source>
-    </extension>
-</addon>
-
 <addon id="plugin.audio.pandoki"
 	name="Pandoki"
 	version="0.9.3"
-	provider-name="gominoa">
+	provider-name="crwolff">
 	<requires>
 		<import addon="xbmc.python" version="2.1.0"/>
 		<import addon="script.module.mutagen" version="1.22.0"/>
@@ -80,7 +21,20 @@
 		<forum>http://forum.xbmc.org/showthread.php?tid=205547</forum>
 		<website></website>
 		<email></email>
-		<source>https://github.com/gominoa/gominoa-xbmc-addons</source>
+		<source>https://github.com/crwolff/crwolff-kodi-addons</source>
+	</extension>
+</addon>
+
+<addon id="repository.crwolff" name="crwolff's Kodi Addons" version="0.1.0" provider-name="crwolff">
+	<extension point="xbmc.addon.repository" name="crwolff's Kodi Addon Repository">
+		<info compressed="false">http://raw.github.com/crwolff/crwolff-kodi-addons/master/addons.xml</info>
+		<checksum>http://raw.github.com/crwolff/crwolff-kodi-addons/master/addons.xml.md5</checksum>
+		<datadir zip="true">http://raw.github.com/crwolff/crwolff-kodi-addons/master/repo</datadir>
+	</extension>
+	<extension point="xbmc.addon.metadata">
+		<summary lang="en">Install crwolff's Addons</summary>
+		<description lang="en">Download and install addons by crwolff</description>
+		<platform>all</platform>
 	</extension>
 </addon>
 </addons>
