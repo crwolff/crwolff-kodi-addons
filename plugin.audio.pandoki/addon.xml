@@ -2,10 +2,9 @@
 <addon id="plugin.audio.pandoki"
 	name="Pandoki"
 	version="0.9.5"
-	provider-name="crwolff">
+	provider-name="gominoa, rocky4546, crwolff">
 	<requires>
-		<import addon="xbmc.python" version="2.1.0"/>
-		<import addon="script.module.mutagen" version="1.22.0"/>
+		<import addon="xbmc.python" version="2.25.0"/>
 	</requires>
 	<extension point="xbmc.python.pluginsource" library="default.py">
 		<provides>audio</provides>
