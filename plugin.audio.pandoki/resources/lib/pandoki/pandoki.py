@@ -32,8 +32,8 @@ _stamp	= str(time.time())
 # xbmc.LOGWARNING = 3
 
 def Log(msg, s = None, level = xbmc.LOGNOTICE):
-    if s and s.get('artist'): xbmc.log("%s %s %s '%s - %s'" % (_id, msg, s['token'][-4:], s['artist'], s['title']), level) # song
-    elif s:                   xbmc.log("%s %s %s '%s'"      % (_id, msg, s['token'][-4:], s['title']), level)              # station
+    if s and s.get('artist'): xbmc.log("%s %s %s '%s - %s'" % (_id, msg, s['token'][-4:].encode('utf-8'), s['artist'].encode('utf-8'), s['title'].encode('utf-8')), level) # song
+    elif s:                   xbmc.log("%s %s %s '%s'"      % (_id, msg, s['token'][-4:], s['title'].encode('utf-8')), level)              # station
     else:                     xbmc.log("%s %s"              % (_id, msg), level)
 
 # setup the ability to provide notification to the Kodi GUI
@@ -361,7 +361,7 @@ class Pandoki(object):
         tag['artist']              = song['artist']
         tag['album']               = song['album']
         tag['title']               = song['title']
-        Log("Save: metadata %s %s %s %s %s" % (song['brain'], song['artist'], song['album'], song['title']), song, xbmc.LOGDEBUG)
+        Log("Save: metadata %s" % song['brain'], song, xbmc.LOGDEBUG)
 
         if song['encoding'] == 'mp3':
             tag.save(v2_version = 3)
