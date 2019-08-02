@@ -2,7 +2,7 @@
 <addons>
 <addon id="plugin.audio.pandoki"
 	name="Pandoki"
-	version="0.9.5a"
+	version="0.9.5b"
 	provider-name="gominoa, rocky4546, crwolff">
 	<requires>
 		<import addon="xbmc.python" version="2.25.0"/>
@@ -17,18 +17,18 @@
 		<language></language>
 		<platform>all</platform>
 		<license>GNU GENERAL PUBLIC LICENSE Version 3, 29 June 2007</license>
-		<forum>http://forum.xbmc.org/showthread.php?tid=205547</forum>
+		<forum>https://forum.xbmc.org/showthread.php?tid=205547</forum>
 		<website></website>
 		<email></email>
 		<source>https://github.com/crwolff/crwolff-kodi-addons</source>
 	</extension>
 </addon>
 
-<addon id="repository.crwolff" name="crwolff's Kodi Addons" version="0.1.0" provider-name="crwolff">
+<addon id="repository.crwolff" name="crwolff's Kodi Addons" version="0.1.1" provider-name="crwolff">
 	<extension point="xbmc.addon.repository" name="crwolff's Kodi Addon Repository">
-		<info compressed="false">http://raw.github.com/crwolff/crwolff-kodi-addons/master/addons.xml</info>
-		<checksum>http://raw.github.com/crwolff/crwolff-kodi-addons/master/addons.xml.md5</checksum>
-		<datadir zip="true">http://raw.github.com/crwolff/crwolff-kodi-addons/master/repo</datadir>
+		<info compressed="false">https://raw.github.com/crwolff/crwolff-kodi-addons/master/addons.xml</info>
+		<checksum>https://raw.github.com/crwolff/crwolff-kodi-addons/master/addons.xml.md5</checksum>
+		<datadir zip="true">https://raw.github.com/crwolff/crwolff-kodi-addons/master/repo</datadir>
 	</extension>
 	<extension point="xbmc.addon.metadata">
 		<summary lang="en">Install crwolff's Addons</summary>

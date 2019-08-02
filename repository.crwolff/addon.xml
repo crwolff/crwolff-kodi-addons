@@ -1,9 +1,9 @@
 ﻿<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<addon id="repository.crwolff" name="crwolff's Kodi Addons" version="0.1.0" provider-name="crwolff">
+<addon id="repository.crwolff" name="crwolff's Kodi Addons" version="0.1.1" provider-name="crwolff">
 	<extension point="xbmc.addon.repository" name="crwolff's Kodi Addon Repository">
-		<info compressed="false">http://raw.github.com/crwolff/crwolff-kodi-addons/master/addons.xml</info>
-		<checksum>http://raw.github.com/crwolff/crwolff-kodi-addons/master/addons.xml.md5</checksum>
-		<datadir zip="true">http://raw.github.com/crwolff/crwolff-kodi-addons/master/repo</datadir>
+		<info compressed="false">https://raw.github.com/crwolff/crwolff-kodi-addons/master/addons.xml</info>
+		<checksum>https://raw.github.com/crwolff/crwolff-kodi-addons/master/addons.xml.md5</checksum>
+		<datadir zip="true">https://raw.github.com/crwolff/crwolff-kodi-addons/master/repo</datadir>
 	</extension>
 	<extension point="xbmc.addon.metadata">
 		<summary lang="en">Install crwolff's Addons</summary>
