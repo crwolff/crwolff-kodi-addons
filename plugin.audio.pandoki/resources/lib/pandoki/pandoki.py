@@ -445,7 +445,7 @@ class Pandoki(object):
         self.downloading = self.downloading + 1
         song['starttime'] = time.time()
         lastnotify = time.time()
-        notification('Caching', '[COLOR lime]' + song['title'] + ' [/COLOR]' , '3000', iconart)
+        notification('Caching', '[COLOR lime]' + song['title'].encode('utf-8') + ' [/COLOR]' , '3000', iconart)
         while (cont) and (size < totl) and (not xbmc.abortRequested) and (not self.abort):
             Log("Downloading %8d bytes, currently %8d bytes " % (totl, size), song, xbmc.LOGDEBUG)
             try: data = strm.read(min(8192, totl - size))
@@ -460,12 +460,12 @@ class Pandoki(object):
             if ( lastnotify + 60 < time.time() ):
                 if (size == lastsize):
                     Log('Aborting Song, Song Stopped Buffering: %d out of %d downloaded' % (size, totl), song)
-                    notification('Song Stopped Buffering' '[COLOR lime] %d' % (size * 100 / totl ) + '% ' + song['title'] + ' [/COLOR]' , '5000', iconart)
+                    notification('Song Stopped Buffering' '[COLOR lime] %d' % (size * 100 / totl ) + '% ' + song['title'].encode('utf-8') + ' [/COLOR]' , '5000', iconart)
                     break
 
                 lastnotify = time.time()
                 lastsize = size
-                notification('Song Buffering', '[COLOR lime] %d' % (size * 100 / totl ) + '% ' + song['title'] + ' [/COLOR]' , '5000', iconart)
+                notification('Song Buffering', '[COLOR lime] %d' % (size * 100 / totl ) + '% ' + song['title'].encode('utf-8') + ' [/COLOR]' , '5000', iconart)
 
 
             if ( size >= totl ):
@@ -569,7 +569,7 @@ class Pandoki(object):
             song['voted'] = 'up'
 	    Prop('voted', 'up')
             self.pithos.add_feedback(song['token'], True)
-            notification('Thumb UP', song['title'], '3000', iconart)
+            notification('Thumb UP', song['title'].encode('utf-8'), '3000', iconart)
             self.Save(song)
 
         elif (mode == 'tired'):
@@ -581,7 +581,7 @@ class Pandoki(object):
 	    Prop('voted', 'down')
             self.player.playnext()
             self.pithos.add_feedback(song['token'], False)
-            notification('Thumb DOWN', song['title'], '3000', iconart)
+            notification('Thumb DOWN', song['title'].encode('utf-8'), '3000', iconart)
             self.M3U(song, True)
 
         elif (mode == 'clear'):
@@ -589,7 +589,7 @@ class Pandoki(object):
 	    Prop('voted', '')
             feedback = self.pithos.add_feedback(song['token'], True)
             self.pithos.del_feedback(song['station'], feedback)
-            notification('Thumb CLEARED', song['title'], '3000', iconart)
+            notification('Thumb CLEARED', song['title'].encode('utf-8'), '3000', iconart)
 
         else: return
 
@@ -608,7 +608,7 @@ class Pandoki(object):
                 self.Branch(song)
             else:
                 self.pithos.add_feedback(song['token'], True)
-                notification('Thumb UP', song['title'], '3000', iconart)
+                notification('Thumb UP', song['title'].encode('utf-8'), '3000', iconart)
             self.Save(song)
 
         elif (rating == '4'):
@@ -616,12 +616,12 @@ class Pandoki(object):
                 self.Seed(song)
             else:
                 self.pithos.add_feedback(song['token'], True)
-                notification('Thumb UP', song['title'], '3000', iconart)
+                notification('Thumb UP', song['title'].encode('utf-8'), '3000', iconart)
             self.Save(song)
 
         elif (rating == '3'):
             self.pithos.add_feedback(song['token'], True)
-            notification('Thumb UP', song['title'], '3000', iconart)
+            notification('Thumb UP', song['title'].encode('utf-8'), '3000', iconart)
             self.Save(song)
 
         elif (rating == '2'):
@@ -629,18 +629,18 @@ class Pandoki(object):
                 self.pithos.set_tired(song['token'])
             else:
                 self.pithos.add_feedback(song['token'], False)
-                notification('Thumb DOWN', song['title'], '3000', iconart)
+                notification('Thumb DOWN', song['title'].encode('utf-8'), '3000', iconart)
             self.player.playnext()
 
         elif (rating == '1'):
             self.pithos.add_feedback(song['token'], False)
-            notification('Thumb DOWN', song['title'], '3000', iconart)
+            notification('Thumb DOWN', song['title'].encode('utf-8'), '3000', iconart)
             self.player.playnext()
 
         elif (rating == ''):
             feedback = self.pithos.add_feedback(song['token'], True)
             self.pithos.del_feedback(song['station'], feedback)
-            notification('Thumb CLEARED', song['title'], '3000', iconart)
+            notification('Thumb CLEARED', song['title'].encode('utf-8'), '3000', iconart)
 
 
     def Scan(self, rate = False):
