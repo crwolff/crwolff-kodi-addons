@@ -32,8 +32,8 @@ _stamp	= str(time.time())
 # xbmc.LOGWARNING = 3
 
 def Log(msg, s = None, level = xbmc.LOGNOTICE):
-    if s and s.get('artist'): xbmc.log("%s %s %s '%s - %s'" % (_id, msg, s['token'][-4:].encode('utf-8'), s['artist'].encode('utf-8'), s['title'].encode('utf-8')), level) # song
-    elif s:                   xbmc.log("%s %s %s '%s'"      % (_id, msg, s['token'][-4:], s['title'].encode('utf-8')), level)              # station
+    if s and s.get('artist'): xbmc.log("%s %s %s '%s - %s'" % (_id, msg, s['token'][-4:], s['artist'].encode('ascii','replace'), s['title'].encode('ascii','replace')), level) # song
+    elif s:                   xbmc.log("%s %s %s '%s'"      % (_id, msg, s['token'][-4:], s['title'].encode('ascii','replace')), level)              # station
     else:                     xbmc.log("%s %s"              % (_id, msg), level)
 
 # setup the ability to provide notification to the Kodi GUI
@@ -358,9 +358,9 @@ class Pandoki(object):
 
         tag['tracknumber']         = "%d/%d" % (song['number'], song['count'])
         tag['musicbrainz_trackid'] = song['brain']
-        tag['artist']              = song['artist'].encode('utf-8')
-        tag['album']               = song['album'].encode('utf-8')
-        tag['title']               = song['title'].encode('utf-8')
+        tag['artist']              = song['artist']
+        tag['album']               = song['album']
+        tag['title']               = song['title']
         Log("Save: metadata %s" % song['brain'], song, xbmc.LOGDEBUG)
 
         if song['encoding'] == 'mp3':
@@ -575,6 +575,7 @@ class Pandoki(object):
         elif (mode == 'tired'):
             self.player.playnext()
             self.pithos.set_tired(song['token'])
+            notification('Tired', song['title'].encode('utf-8'), '3000', iconart)
 
         elif (mode == 'down'):
             song['voted'] = 'down'
@@ -677,21 +678,21 @@ class Pandoki(object):
         lib  = Val('library')
         badc = '\\/?%*:|"<>.'		# remove bad filename chars
 
-        s['artist'] = ''.join(c for c in s['artist'].encode('utf-8').replace('"',"'") if c not in badc)
-        s['album']  = ''.join(c for c in s['album'].encode('utf-8').replace('"',"'")  if c not in badc)
-        s['title']  = ''.join(c for c in s['title'].encode('utf-8').replace('"',"'")  if c not in badc)
+        artist = ''.join(c for c in s['artist'].replace('"',"'") if c not in badc)
+        album  = ''.join(c for c in s['album'].replace('"',"'") if c not in badc)
+        title  = ''.join(c for c in s['title'].replace('"',"'") if c not in badc)
 
-        s['path_cch'] = xbmc.translatePath(asciidamnit.asciiDammit("%s/%s - %s.%s"            % (Val('cache'), s['artist'], s['title'],  s['encoding'])))
-        s['path_dir'] = xbmc.translatePath(asciidamnit.asciiDammit("%s/%s/%s - %s"            % (lib,          s['artist'], s['artist'], s['album'])))
-        s['path_m4a'] = xbmc.translatePath(asciidamnit.asciiDammit("%s/%s/%s - %s/%s - %s.%s" % (lib,          s['artist'], s['artist'], s['album'], s['artist'], s['title'], 'm4a'))) #s['encoding'])))
-        s['path_mp3'] = xbmc.translatePath(asciidamnit.asciiDammit("%s/%s/%s - %s/%s - %s.%s" % (lib,          s['artist'], s['artist'], s['album'], s['artist'], s['title'], 'mp3'))) #s['encoding'])))
-        s['path_lib'] = xbmc.translatePath(asciidamnit.asciiDammit("%s/%s/%s - %s/%s - %s.%s" % (lib,          s['artist'], s['artist'], s['album'], s['artist'], s['title'], s['encoding'])))
-        s['path_alb'] = xbmc.translatePath(asciidamnit.asciiDammit("%s/%s/%s - %s/folder.jpg" % (lib,          s['artist'], s['artist'], s['album'])))
-        s['path_art'] = xbmc.translatePath(asciidamnit.asciiDammit("%s/%s/folder.jpg"         % (lib,          s['artist']))) #.decode("utf-8")
+        s['path_cch'] = xbmc.translatePath(asciidamnit.asciiDammit("%s/%s - %s.%s"            % (Val('cache'), artist, title,  s['encoding'])))
+        s['path_dir'] = xbmc.translatePath(asciidamnit.asciiDammit("%s/%s/%s - %s"            % (lib,          artist, artist, album)))
+        s['path_m4a'] = xbmc.translatePath(asciidamnit.asciiDammit("%s/%s/%s - %s/%s - %s.%s" % (lib,          artist, artist, album, artist, title, 'm4a'))) #s['encoding'])))
+        s['path_mp3'] = xbmc.translatePath(asciidamnit.asciiDammit("%s/%s/%s - %s/%s - %s.%s" % (lib,          artist, artist, album, artist, title, 'mp3'))) #s['encoding'])))
+        s['path_lib'] = xbmc.translatePath(asciidamnit.asciiDammit("%s/%s/%s - %s/%s - %s.%s" % (lib,          artist, artist, album, artist, title, s['encoding'])))
+        s['path_alb'] = xbmc.translatePath(asciidamnit.asciiDammit("%s/%s/%s - %s/folder.jpg" % (lib,          artist, artist, album)))
+        s['path_art'] = xbmc.translatePath(asciidamnit.asciiDammit("%s/%s/folder.jpg"         % (lib,          artist))) #.decode("utf-8")
 
-        title = ''.join(c for c in self.station['title'].encode('utf-8').replace('"',"'") if c not in badc)
+        title = ''.join(c for c in self.station['title'] if c not in badc)
         s['path_m3u'] = xbmc.translatePath(asciidamnit.asciiDammit("%s/%s.m3u"                % (lib, title)))
-        s['path_rel'] = xbmc.translatePath(asciidamnit.asciiDammit(   "%s/%s - %s/%s - %s.%s" % (     s['artist'], s['artist'], s['album'], s['artist'], s['title'], s['encoding'])))
+        s['path_rel'] = xbmc.translatePath(asciidamnit.asciiDammit(   "%s/%s - %s/%s - %s.%s" % (     artist, artist, album, artist, title, s['encoding'])))
 
 
     def Fill(self):
