@@ -678,21 +678,21 @@ class Pandoki(object):
         lib  = Val('library')
         badc = '\\/?%*:|"<>.'		# remove bad filename chars
 
-        artist = ''.join(c for c in s['artist'].replace('"',"'") if c not in badc)
-        album  = ''.join(c for c in s['album'].replace('"',"'") if c not in badc)
-        title  = ''.join(c for c in s['title'].replace('"',"'") if c not in badc)
+        artist = ''.join(c for c in asciidamnit.asciiDammit(s['artist']).replace('"',"'") if c not in badc)
+        album = ''.join(c for c in asciidamnit.asciiDammit(s['album']).replace('"',"'") if c not in badc)
+        title = ''.join(c for c in asciidamnit.asciiDammit(s['title']).replace('"',"'") if c not in badc)
 
-        s['path_cch'] = xbmc.translatePath(asciidamnit.asciiDammit("%s/%s - %s.%s"            % (Val('cache'), artist, title,  s['encoding'])))
-        s['path_dir'] = xbmc.translatePath(asciidamnit.asciiDammit("%s/%s/%s - %s"            % (lib,          artist, artist, album)))
-        s['path_m4a'] = xbmc.translatePath(asciidamnit.asciiDammit("%s/%s/%s - %s/%s - %s.%s" % (lib,          artist, artist, album, artist, title, 'm4a'))) #s['encoding'])))
-        s['path_mp3'] = xbmc.translatePath(asciidamnit.asciiDammit("%s/%s/%s - %s/%s - %s.%s" % (lib,          artist, artist, album, artist, title, 'mp3'))) #s['encoding'])))
-        s['path_lib'] = xbmc.translatePath(asciidamnit.asciiDammit("%s/%s/%s - %s/%s - %s.%s" % (lib,          artist, artist, album, artist, title, s['encoding'])))
-        s['path_alb'] = xbmc.translatePath(asciidamnit.asciiDammit("%s/%s/%s - %s/folder.jpg" % (lib,          artist, artist, album)))
-        s['path_art'] = xbmc.translatePath(asciidamnit.asciiDammit("%s/%s/folder.jpg"         % (lib,          artist))) #.decode("utf-8")
+        s['path_cch'] = xbmc.translatePath("%s/%s - %s.%s"            % (Val('cache'), artist, title,  s['encoding']))
+        s['path_dir'] = xbmc.translatePath("%s/%s/%s - %s"            % (lib,          artist, artist, album))
+        s['path_m4a'] = xbmc.translatePath("%s/%s/%s - %s/%s - %s.%s" % (lib,          artist, artist, album, artist, title, 'm4a')) #s['encoding'])))
+        s['path_mp3'] = xbmc.translatePath("%s/%s/%s - %s/%s - %s.%s" % (lib,          artist, artist, album, artist, title, 'mp3')) #s['encoding'])))
+        s['path_lib'] = xbmc.translatePath("%s/%s/%s - %s/%s - %s.%s" % (lib,          artist, artist, album, artist, title, s['encoding']))
+        s['path_alb'] = xbmc.translatePath("%s/%s/%s - %s/folder.jpg" % (lib,          artist, artist, album))
+        s['path_art'] = xbmc.translatePath("%s/%s/folder.jpg"         % (lib,          artist)) #.decode("utf-8")
 
-        title = ''.join(c for c in self.station['title'] if c not in badc)
-        s['path_m3u'] = xbmc.translatePath(asciidamnit.asciiDammit("%s/%s.m3u"                % (lib, title)))
-        s['path_rel'] = xbmc.translatePath(asciidamnit.asciiDammit(   "%s/%s - %s/%s - %s.%s" % (     artist, artist, album, artist, title, s['encoding'])))
+        title = ''.join(c for c in asciidamnit.asciiDammit(self.station['title']).replace('"',"'") if c not in badc)
+        s['path_m3u'] = xbmc.translatePath("%s/%s.m3u"                % (lib, title))
+        s['path_rel'] = xbmc.translatePath("%s/%s - %s/%s - %s.%s"    % (     artist, artist, album, artist, title, s['encoding']))
 
 
     def Fill(self):
