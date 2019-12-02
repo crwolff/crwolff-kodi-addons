@@ -37,7 +37,7 @@
 	</extension>
 </addon>
 
-<addon id="skin.confluence" version="4.6.10" name="Confluence" provider-name="Jezz_X, Team Kodi">
+<addon id="skin.confluence" version="4.6.11" name="Confluence" provider-name="Jezz_X, Team Kodi">
 	<requires>
 		<import addon="xbmc.gui" version="5.14.0"/>
 	</requires>
