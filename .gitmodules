@@ -1,0 +1,6 @@
+[submodule "skin.confluence"]
+	path = skin.confluence
+	url = https://github.com/xbmc/skin.confluence
+[submodule "screensaver.pimon"]
+	path = screensaver.pimon
+	url = https://github.com/SonRiab/screensaver.pimon
