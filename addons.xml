@@ -37,6 +37,43 @@
 	</extension>
 </addon>
 
+<addon id="screensaver.pimon" name="PiMon" version="0.3.3" provider-name="Tim Ker, SonRiab">
+    <requires>
+        <import addon="xbmc.python" version="2.20.0"/>
+    </requires>
+    <extension point="xbmc.ui.screensaver" library="default.py" />
+    <extension point="xbmc.addon.metadata">
+        <summary lang="en">Toggles HDMI output on Raspberry Pi devices</summary>
+        <summary lang="de">Schaltet den HDMI Ausgangs auf Raspberry Pi Geräte an/aus</summary>
+        <description lang="en">This screensaver doesn't show any fancy animations or other stuff, but toggles the HDMI output on Raspberry Pi devices, so screens could go into sleep mode or wake up.</description>
+        <description lang="de">Dieser Bildschirmschoner zeigt keine hübschen Animationen oder anderes Zeug, sondern schaltet den HDMI Ausgang auf Raspberry Pi Geräten an/aus, so dass Monitore in den Schlafmodus gehen können oder aus diesem geweckt werden.</description>
+        <disclaimer></disclaimer>
+        <news>
+            0.3.3
+             - fix screens not waking up (sometimes)
+             - change id to screensaver.pimon
+             - change name to PiMon
+            0.3.1
+             - icon updated
+             - change platform to linux
+             - update description
+            0.3.0
+             - remove unnecessary stuff (settings, images)
+             - new icon
+            0.2.1
+             - added support for more pi distributions
+            0.1.0
+             - ripped of the nyan cat screensaver
+        </news>
+        <platform>linux</platform>
+        <language></language>
+        <license>GNU GENERAL PUBLIC LICENSE. Version 2, June 1991</license> <forum>http://forum.kodi.tv/showthread.php?tid=163016&amp;pid=1995838#pid1995838</forum>
+        <website></website>
+        <source>https://github.com/SonRiab/screensaver.pimon</source>
+        <email></email>
+    </extension>
+</addon>
+
 <addon id="skin.confluence" version="4.7.0" name="Confluence" provider-name="Jezz_X, Team Kodi">
 	<requires>
 		<import addon="xbmc.gui" version="5.14.0"/>
@@ -183,42 +220,5 @@
 		</assets>
 		<news>Added chapter markers to progress bar.</news>
 	</extension>
-</addon>
-
-<addon id="screensaver.pimon" name="PiMon" version="0.3.3" provider-name="Tim Ker, SonRiab">
-    <requires>
-        <import addon="xbmc.python" version="2.20.0"/>
-    </requires>
-    <extension point="xbmc.ui.screensaver" library="default.py" />
-    <extension point="xbmc.addon.metadata">
-        <summary lang="en">Toggles HDMI output on Raspberry Pi devices</summary>
-        <summary lang="de">Schaltet den HDMI Ausgangs auf Raspberry Pi Geräte an/aus</summary>
-        <description lang="en">This screensaver doesn't show any fancy animations or other stuff, but toggles the HDMI output on Raspberry Pi devices, so screens could go into sleep mode or wake up.</description>
-        <description lang="de">Dieser Bildschirmschoner zeigt keine hübschen Animationen oder anderes Zeug, sondern schaltet den HDMI Ausgang auf Raspberry Pi Geräten an/aus, so dass Monitore in den Schlafmodus gehen können oder aus diesem geweckt werden.</description>
-        <disclaimer></disclaimer>
-        <news>
-            0.3.3
-             - fix screens not waking up (sometimes)
-             - change id to screensaver.pimon
-             - change name to PiMon
-            0.3.1
-             - icon updated
-             - change platform to linux
-             - update description
-            0.3.0
-             - remove unnecessary stuff (settings, images)
-             - new icon
-            0.2.1
-             - added support for more pi distributions
-            0.1.0
-             - ripped of the nyan cat screensaver
-        </news>
-        <platform>linux</platform>
-        <language></language>
-        <license>GNU GENERAL PUBLIC LICENSE. Version 2, June 1991</license> <forum>http://forum.kodi.tv/showthread.php?tid=163016&amp;pid=1995838#pid1995838</forum>
-        <website></website>
-        <source>https://github.com/SonRiab/screensaver.pimon</source>
-        <email></email>
-    </extension>
 </addon>
 </addons>
