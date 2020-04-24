@@ -40,7 +40,7 @@ def Log(msg, s = None, level = xbmc.LOGNOTICE):
 iconart = xbmc.translatePath(os.path.join('special://home/addons/plugin.audio.pandoki',  'icon.png'))
 
 def notification(title, message, ms, nart):
-    xbmc.executebuiltin("XBMC.notification(" + title + "," + message + "," + ms + "," + nart + ")")
+    xbmc.executebuiltin("XBMC.notification(" + title + "," + message.replace(',', ';') + "," + ms + "," + nart + ")")
 
 
 def Val(key, val = None):
@@ -460,7 +460,7 @@ class Pandoki(object):
             if ( lastnotify + 60 < time.time() ):
                 if (size == lastsize):
                     Log('Aborting Song, Song Stopped Buffering: %d out of %d downloaded' % (size, totl), song)
-                    notification('Song Stopped Buffering' '[COLOR lime] %d' % (size * 100 / totl ) + '% ' + song['title'].encode('utf-8') + ' [/COLOR]' , '5000', iconart)
+                    notification('Song Stopped Buffering', '[COLOR lime] %d' % (size * 100 / totl ) + '% ' + song['title'].encode('utf-8') + ' [/COLOR]' , '5000', iconart)
                     break
 
                 lastnotify = time.time()

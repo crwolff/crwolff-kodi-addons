@@ -2,7 +2,7 @@
 <addons>
 <addon id="plugin.audio.pandoki"
 	name="Pandoki"
-	version="0.9.5f"
+	version="0.9.5g"
 	provider-name="gominoa, rocky4546, crwolff">
 	<requires>
 		<import addon="xbmc.python" version="2.25.0"/>
@@ -74,7 +74,7 @@
     </extension>
 </addon>
 
-<addon id="skin.confluence" version="4.7.0" name="Confluence" provider-name="Jezz_X, Team Kodi">
+<addon id="skin.confluence" version="4.7.3" name="Confluence" provider-name="Jezz_X, Team Kodi">
 	<requires>
 		<import addon="xbmc.gui" version="5.14.0"/>
 	</requires>
@@ -218,7 +218,7 @@
 			<screenshot>resources/screenshot-08.jpg</screenshot>
 			<screenshot>resources/screenshot-09.jpg</screenshot>
 		</assets>
-		<news>Added chapter markers to progress bar.</news>
+		<news>- Add support for PVR reminders.[CR]- Fix / add new buttons in PVR information window.[CR]- Update PVR group manager dialog with latest changes.</news>
 	</extension>
 </addon>
 </addons>
