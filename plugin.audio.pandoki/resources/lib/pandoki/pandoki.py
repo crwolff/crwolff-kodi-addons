@@ -340,6 +340,7 @@ class Pandoki(object):
     def Save(self, song):
         Log('def Save ', song, xbmc.LOGDEBUG)
         if (song['title'] == 'Advertisement') or (song.get('saved')) or (not song.get('cached', False)): return
+        if ('(Live' in song['title'].encode('utf-8')): return
         if (Val('mode') in ('0', '3')) or ((Val('mode') == '2') and (song.get('voted') != 'up')): return
         if (not self.Tag(song)): return
 
@@ -412,6 +413,12 @@ class Pandoki(object):
             if (Val('skip') == 'true'):
                 song['qued'] = True
                 self.Msg('Skipping Advertisements')
+
+        if ('(Live' in song['title'].encode('utf-8')) and (not song.get('qued')):
+            self.pithos.set_tired(song['token'])
+            notification('Tired', song['title'].encode('utf-8'), '3000', iconart)
+            Log('Tired', song, xbmc.LOGNOTICE)
+            song['qued'] = True
 
         Log('Cache QU: ready=%s size=%8d bitrate:%8d' % (song.get('ready'), size, song['bitrate']), song, xbmc.LOGDEBUG)
         if song.get('ready',False) and (not song.get('qued')) and (size >= (song['bitrate'] / 8 * 1024 * int(Val('delay')))):
