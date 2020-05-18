@@ -91,6 +91,8 @@ class Pandoki(object):
         xbmcvfs.mkdirs(xbmc.translatePath(Val('cache')).decode("utf-8"))
         xbmcvfs.mkdirs(xbmc.translatePath(Val('library')).decode("utf-8"))
 
+        # Clean cache at startup
+        self.Flush()
 
     def Proxy(self):
         Log('def Proxy ', None, xbmc.LOGDEBUG)
@@ -340,7 +342,8 @@ class Pandoki(object):
     def Save(self, song):
         Log('def Save ', song, xbmc.LOGDEBUG)
         if (song['title'] == 'Advertisement') or (song.get('saved')) or (not song.get('cached', False)): return
-        if ('(Live' in song['title'].encode('utf-8')): return
+        if ('(Live' in song['title'].encode('utf-8')) or ('Live)' in song['title'].encode('utf-8')): return
+        if ('Live At The ' in song['album'].encode('utf-8')): return
         if (Val('mode') in ('0', '3')) or ((Val('mode') == '2') and (song.get('voted') != 'up')): return
         if (not self.Tag(song)): return
 
@@ -414,10 +417,15 @@ class Pandoki(object):
                 song['qued'] = True
                 self.Msg('Skipping Advertisements')
 
-        if ('(Live' in song['title'].encode('utf-8')) and (not song.get('qued')):
+        if (not song.get('qued')) and (('(Live' in song['title'].encode('utf-8')) or ('Live)' in song['title'].encode('utf-8'))):
             self.pithos.set_tired(song['token'])
             notification('Tired', song['title'].encode('utf-8'), '3000', iconart)
             Log('Tired', song, xbmc.LOGNOTICE)
+            song['qued'] = True
+        elif (not song.get('qued')) and ('Live At The ' in song['album'].encode('utf-8')):
+            self.pithos.set_tired(song['token'])
+            notification('Tired', song['album'].encode('utf-8'), '3000', iconart)
+            Log('Tired (album)', song, xbmc.LOGNOTICE)
             song['qued'] = True
 
         Log('Cache QU: ready=%s size=%8d bitrate:%8d' % (song.get('ready'), size, song['bitrate']), song, xbmc.LOGDEBUG)
