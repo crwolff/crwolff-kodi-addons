@@ -40,7 +40,9 @@ def Log(msg, s = None, level = xbmc.LOGNOTICE):
 iconart = xbmc.translatePath(os.path.join('special://home/addons/plugin.audio.pandoki',  'icon.png'))
 
 def notification(title, message, ms, nart):
-    xbmc.executebuiltin("XBMC.notification(" + title + "," + message.replace(',', ';') + "," + ms + "," + nart + ")")
+    message = message.replace(',', ';')		# bad character
+    message = message.replace('"', '\\"')	# bad character
+    xbmc.executebuiltin("XBMC.notification(" + title + "," + message + "," + ms + "," + nart + ")")
 
 
 def Val(key, val = None):
