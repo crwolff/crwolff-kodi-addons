@@ -419,16 +419,17 @@ class Pandoki(object):
                 song['qued'] = True
                 self.Msg('Skipping Advertisements')
 
-        if (not song.get('qued')) and (('(Live' in song['title'].encode('utf-8')) or ('Live)' in song['title'].encode('utf-8'))):
-            self.pithos.set_tired(song['token'])
-            notification('Tired', song['title'].encode('utf-8'), '3000', iconart)
-            Log('Tired', song, xbmc.LOGNOTICE)
-            song['qued'] = True
-        elif (not song.get('qued')) and ('Live At The ' in song['album'].encode('utf-8')):
-            self.pithos.set_tired(song['token'])
-            notification('Tired', song['album'].encode('utf-8'), '3000', iconart)
-            Log('Tired (album)', song, xbmc.LOGNOTICE)
-            song['qued'] = True
+        if (not song.get('qued')):
+            if ('(Live' in song['title'].encode('utf-8')) or ('Live)' in song['title'].encode('utf-8')):
+                self.pithos.set_tired(song['token'])
+                notification('Tired', song['title'].encode('utf-8'), '3000', iconart)
+                Log('Tired', song, xbmc.LOGNOTICE)
+                song['qued'] = True
+            elif ('Live At The ' in song['album'].encode('utf-8')):
+                self.pithos.set_tired(song['token'])
+                notification('Tired', song['album'].encode('utf-8'), '3000', iconart)
+                Log('Tired (album)', song, xbmc.LOGNOTICE)
+                song['qued'] = True
 
         Log('Cache QU: ready=%s size=%8d bitrate:%8d' % (song.get('ready'), size, song['bitrate']), song, xbmc.LOGDEBUG)
         if song.get('ready',False) and (not song.get('qued')) and (size >= (song['bitrate'] / 8 * 1024 * int(Val('delay')))):
@@ -462,7 +463,8 @@ class Pandoki(object):
         self.downloading = self.downloading + 1
         song['starttime'] = time.time()
         lastnotify = time.time()
-        notification('Caching', '[COLOR lime]' + song['title'].encode('utf-8') + ' [/COLOR]' , '3000', iconart)
+        if (not song.get('qued')):
+            notification('Caching', '[COLOR lime]' + song['title'].encode('utf-8') + ' [/COLOR]' , '3000', iconart)
         while (cont) and (size < totl) and (not xbmc.abortRequested) and (not self.abort):
             Log("Downloading %8d bytes, currently %8d bytes " % (totl, size), song, xbmc.LOGDEBUG)
             try: data = strm.read(min(8192, totl - size))
