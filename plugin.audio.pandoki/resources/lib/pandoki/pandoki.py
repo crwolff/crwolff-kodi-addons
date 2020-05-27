@@ -329,8 +329,8 @@ class Pandoki(object):
         Log('def Tag ', song, xbmc.LOGDEBUG)
         try:
             res = musicbrainzngs.search_recordings(limit = 1, query = song['title'], artist = song['artist'], release = song['album'], qdur = str(song['duration'] * 1000))['recording-list'][0]
-            song['number'] = int(res['release-list'][0]['medium-list'][1]['track-list'][0]['number'])
-            song['count']  =     res['release-list'][0]['medium-list'][1]['track-count']
+            song['number'] = int(res['release-list'][0]['medium-list'][-1]['track-list'][0]['number'])
+            song['count']  =     res['release-list'][0]['medium-list'][-1]['track-count']
             song['score']  =     res['ext:score']
             song['brain']  =     res['id']
 

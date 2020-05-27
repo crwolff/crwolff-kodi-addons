@@ -22,9 +22,6 @@ def _unicode(string, encoding=None):
             encoding = sys.stdin.encoding
         if encoding is None:
             encoding = locale.getpreferredencoding()
-        if encoding is None:
-            encoding = 'UTF-8'
-
         unicode_string = string.decode(encoding, "ignore")
     else:
         unicode_string = compat.unicode(string)

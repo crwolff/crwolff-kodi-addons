@@ -7,34 +7,47 @@ import re
 import xml.etree.ElementTree as ET
 import logging
 
-from musicbrainzngs import util
+from . import util
 
-try:
-    from ET import fixtag
-except:
-    # Python < 2.7
-    def fixtag(tag, namespaces):
-        # given a decorated tag (of the form {uri}tag), return prefixed
-        # tag and namespace declaration, if any
-        if isinstance(tag, ET.QName):
-            tag = tag.text
-        namespace_uri, tag = tag[1:].split("}", 1)
-        prefix = namespaces.get(namespace_uri)
-        if prefix is None:
-            prefix = "ns%d" % len(namespaces)
-            namespaces[namespace_uri] = prefix
-            if prefix == "xml":
-                xmlns = None
-            else:
-                xmlns = ("xmlns:%s" % prefix, namespace_uri)
-        else:
+
+def fixtag(tag, namespaces):
+    # given a decorated tag (of the form {uri}tag), return prefixed
+    # tag and namespace declaration, if any
+    if isinstance(tag, ET.QName):
+        tag = tag.text
+    namespace_uri, tag = tag[1:].split("}", 1)
+    prefix = namespaces.get(namespace_uri)
+    if prefix is None:
+        prefix = "ns%d" % len(namespaces)
+        namespaces[namespace_uri] = prefix
+        if prefix == "xml":
             xmlns = None
-        return "%s:%s" % (prefix, tag), xmlns
+        else:
+            xmlns = ("xmlns:%s" % prefix, namespace_uri)
+    else:
+        xmlns = None
+    return "%s:%s" % (prefix, tag), xmlns
 
 
 NS_MAP = {"http://musicbrainz.org/ns/mmd-2.0#": "ws2",
           "http://musicbrainz.org/ns/ext#-2.0": "ext"}
 _log = logging.getLogger("musicbrainzngs")
+
+def get_error_message(error):
+    """ Given an error XML message from the webservice containing
+    <error><text>x</text><text>y</text></error>, return a list
+    of [x, y]"""
+    try:
+        tree = util.bytes_to_elementtree(error)
+        root = tree.getroot()
+        errors = []
+        if root.tag == "error":
+            for ch in root:
+                if ch.tag == "text":
+                    errors.append(ch.text)
+        return errors
+    except ET.ParseError:
+        return None
 
 def make_artist_credit(artists):
     names = []
@@ -68,8 +81,10 @@ def parse_elements(valid_els, inner_els, element):
         call parse_subelement(<subelement>) and
         return a dict {'subelement': <result>}
         if parse_subelement returns a tuple of the form
-        ('subelement-key', <result>) then return a dict
-        {'subelement-key': <result>} instead
+        (True, {'subelement-key': <result>})
+        then merge the second element of the tuple into the
+        result (which may have a key other than 'subelement' or
+        more than 1 key)
     """
     result = {}
     for sub in element:
@@ -80,8 +95,8 @@ def parse_elements(valid_els, inner_els, element):
             result[t] = sub.text or ""
         elif t in inner_els.keys():
             inner_result = inner_els[t](sub)
-            if isinstance(inner_result, tuple):
-                result[inner_result[0]] = inner_result[1]
+            if isinstance(inner_result, tuple) and inner_result[0]:
+                result.update(inner_result[1])
             else:
                 result[t] = inner_result
             # add counts for lists when available
@@ -119,10 +134,13 @@ def parse_message(message):
     result = {}
     valid_elements = {"area": parse_area,
                       "artist": parse_artist,
+                      "instrument": parse_instrument,
                       "label": parse_label,
                       "place": parse_place,
+                      "event": parse_event,
                       "release": parse_release,
                       "release-group": parse_release_group,
+                      "series": parse_series,
                       "recording": parse_recording,
                       "work": parse_work,
                       "url": parse_url,
@@ -136,8 +154,11 @@ def parse_message(message):
                       "artist-list": parse_artist_list,
                       "label-list": parse_label_list,
                       "place-list": parse_place_list,
+                      "event-list": parse_event_list,
+                      "instrument-list": parse_instrument_list,
                       "release-list": parse_release_list,
                       "release-group-list": parse_release_group_list,
+                      "series-list": parse_series_list,
                       "recording-list": parse_recording_list,
                       "work-list": parse_work_list,
                       "url-list": parse_url_list,
@@ -158,9 +179,14 @@ def parse_collection_list(cl):
 
 def parse_collection(collection):
     result = {}
-    attribs = ["id"]
+    attribs = ["id", "type", "entity-type"]
     elements = ["name", "editor"]
-    inner_els = {"release-list": parse_release_list}
+    inner_els = {"release-list": parse_release_list,
+                 "artist-list": parse_artist_list,
+                 "event-list": parse_event_list,
+                 "place-list": parse_place_list,
+                 "recording-list": parse_recording_list,
+                 "work-list": parse_work_list}
     result.update(parse_attributes(attribs, collection))
     result.update(parse_elements(elements, inner_els, collection))
 
@@ -257,6 +283,38 @@ def parse_place(place):
 
     return result
 
+def parse_event_list(el):
+    return [parse_event(e) for e in el]
+
+def parse_event(event):
+    result = {}
+    attribs = ["id", "type", "ext:score"]
+    elements = ["name", "time", "setlist", "cancelled", "disambiguation", "user-rating"]
+    inner_els = {"life-span": parse_lifespan,
+                 "relation-list": parse_relation_list,
+                 "alias-list": parse_alias_list,
+                 "tag-list": parse_tag_list,
+                 "user-tag-list": parse_tag_list,
+                 "rating": parse_rating}
+
+    result.update(parse_attributes(attribs, event))
+    result.update(parse_elements(elements, inner_els, event))
+
+    return result
+
+def parse_instrument(instrument):
+    result = {}
+    attribs = ["id", "type", "ext:score"]
+    elements = ["name", "description", "disambiguation"]
+    inner_els = {"relation-list": parse_relation_list,
+                 "tag-list": parse_tag_list,
+                 "alias-list": parse_alias_list,
+                 "annotation": parse_annotation}
+    result.update(parse_attributes(attribs, instrument))
+    result.update(parse_elements(elements, inner_els, instrument))
+
+    return result
+
 def parse_label_list(ll):
     return [parse_label(l) for l in ll]
 
@@ -284,34 +342,62 @@ def parse_label(label):
 def parse_relation_target(tgt):
     attributes = parse_attributes(['id'], tgt)
     if 'id' in attributes:
-        return ('target-id', attributes['id'])
+        return (True, {'target-id': attributes['id']})
     else:
-        return ('target-id', tgt.text)
+        return (True, {'target-id': tgt.text})
 
 def parse_relation_list(rl):
     attribs = ["target-type"]
     ttype = parse_attributes(attribs, rl)
     key = "%s-relation-list" % ttype["target-type"]
-    return (key, [parse_relation(r) for r in rl])
+    return (True, {key: [parse_relation(r) for r in rl]})
 
 def parse_relation(relation):
     result = {}
     attribs = ["type", "type-id"]
-    elements = ["target", "direction", "begin", "end", "ended"]
+    elements = ["target", "direction", "begin", "end", "ended", "ordering-key"]
     inner_els = {"area": parse_area,
                  "artist": parse_artist,
+                 "instrument": parse_instrument,
                  "label": parse_label,
                  "place": parse_place,
+                 "event": parse_event,
                  "recording": parse_recording,
                  "release": parse_release,
                  "release-group": parse_release_group,
+                 "series": parse_series,
                  "attribute-list": parse_element_list,
                  "work": parse_work,
                  "target": parse_relation_target
                 }
     result.update(parse_attributes(attribs, relation))
     result.update(parse_elements(elements, inner_els, relation))
+    # We parse attribute-list again to get attributes that have both
+    # text and attribute values
+    result.update(parse_elements(['target-credit'], {"attribute-list": parse_relation_attribute_list}, relation))
 
+    return result
+
+def parse_relation_attribute_list(attributelist):
+    ret = []
+    for attribute in attributelist:
+        ret.append(parse_relation_attribute_element(attribute))
+    return (True, {"attributes": ret})
+
+def parse_relation_attribute_element(element):
+    # Parses an attribute into a dictionary containing an element
+    # {"attribute": <text value>} and also an additional element
+    # containing any xml attributes.
+    # e.g <attribute value="BuxWV 1">number</attribute>
+    # -> {"attribute": "number", "value": "BuxWV 1"}
+    result = {}
+    for attr in element.attrib:
+        if "{" in attr:
+            a = fixtag(attr, NS_MAP)[0]
+        else:
+            a = attr
+        result[a] = element.attrib[attr]
+    result["attribute"] = element.text
     return result
 
 def parse_release(release):
@@ -324,6 +410,8 @@ def parse_release(release):
                  "label-info-list": parse_label_info_list,
                  "medium-list": parse_medium_list,
                  "release-group": parse_release_group,
+                 "tag-list": parse_tag_list,
+                 "user-tag-list": parse_tag_list,
                  "relation-list": parse_relation_list,
                  "annotation": parse_annotation,
                  "cover-art-archive": parse_caa,
@@ -338,7 +426,22 @@ def parse_release(release):
     return result
 
 def parse_medium_list(ml):
-    return [parse_medium(m) for m in ml]
+    """medium-list results from search have an additional
+    <track-count> element containing the number of tracks
+    over all mediums. Optionally add this"""
+    medium_list = []
+    track_count = None
+    for m in ml:
+        tag = fixtag(m.tag, NS_MAP)[0]
+        if tag == "ws2:medium":
+            medium_list.append(parse_medium(m))
+        elif tag == "ws2:track-count":
+            track_count = int(m.text)
+    ret = {"medium-list": medium_list}
+    if track_count is not None:
+        ret["medium-track-count"] = track_count
+
+    return (True, ret)
 
 def parse_release_event_list(rel):
     return [parse_release_event(re) for re in rel]
@@ -355,7 +458,9 @@ def parse_medium(medium):
     result = {}
     elements = ["position", "format", "title"]
     inner_els = {"disc-list": parse_disc_list,
-                 "track-list": parse_track_list}
+                 "pregap": parse_track,
+                 "track-list": parse_track_list,
+                 "data-track-list": parse_track_list}
 
     result.update(parse_elements(elements, inner_els, medium))
     return result
@@ -397,7 +502,6 @@ def parse_recording(recording):
                  "user-tag-list": parse_tag_list,
                  "rating": parse_rating,
                  "isrc-list": parse_external_id_list,
-                 "echoprint-list": parse_external_id_list,
                  "relation-list": parse_relation_list,
                  "annotation": parse_annotation}
 
@@ -405,6 +509,22 @@ def parse_recording(recording):
     result.update(parse_elements(elements, inner_els, recording))
     if "artist-credit" in result:
         result["artist-credit-phrase"] = make_artist_credit(result["artist-credit"])
+
+    return result
+
+def parse_series_list(sl):
+    return [parse_series(s) for s in sl]
+
+def parse_series(series):
+    result = {}
+    attribs = ["id", "type", "ext:score"]
+    elements = ["name", "disambiguation"]
+    inner_els = {"alias-list": parse_alias_list,
+                 "relation-list": parse_relation_list,
+                 "annotation": parse_annotation}
+
+    result.update(parse_attributes(attribs, series))
+    result.update(parse_elements(elements, inner_els, series))
 
     return result
 
@@ -427,12 +547,28 @@ def parse_work(work):
                  "alias-list": parse_alias_list,
                  "iswc-list": parse_element_list,
                  "relation-list": parse_relation_list,
-                 "annotation": parse_response_message}
+                 "annotation": parse_response_message,
+                 "attribute-list": parse_work_attribute_list
+    }
 
     result.update(parse_attributes(attribs, work))
     result.update(parse_elements(elements, inner_els, work))
 
     return result
+
+def parse_work_attribute_list(wal):
+    return [parse_work_attribute(wa) for wa in wal]
+
+def parse_work_attribute(wa):
+    attribs = ["type"]
+    typeinfo = parse_attributes(attribs, wa)
+    result = {}
+    if typeinfo:
+        result = {"attribute": typeinfo["type"],
+                  "value": wa.text}
+
+    return result
+
 
 def parse_url_list(ul):
     return [parse_url(u) for u in ul]
@@ -452,7 +588,9 @@ def parse_disc(disc):
     result = {}
     attribs = ["id"]
     elements = ["sectors"]
-    inner_els = {"release-list": parse_release_list}
+    inner_els = {"release-list": parse_release_list,
+                 "offset-list": parse_offset_list
+    }
 
     result.update(parse_attributes(attribs, disc))
     result.update(parse_elements(elements, inner_els, disc))
@@ -468,6 +606,15 @@ def parse_cdstub(cdstub):
     result.update(parse_attributes(attribs, cdstub))
     result.update(parse_elements(elements, inner_els, cdstub))
 
+    return result
+
+def parse_offset_list(ol):
+    return [int(o.text) for o in ol]
+
+def parse_instrument_list(rl):
+    result = []
+    for r in rl:
+        result.append(parse_instrument(r))
     return result
 
 def parse_release_list(rl):
@@ -617,45 +764,40 @@ def make_barcode_request(release2barcode):
 
     return ET.tostring(root, "utf-8")
 
-def make_tag_request(artist2tags, recording2tags):
+def make_tag_request(**kwargs):
     NS = "http://musicbrainz.org/ns/mmd-2.0#"
     root = ET.Element("{%s}metadata" % NS)
-    rec_list = ET.SubElement(root, "{%s}recording-list" % NS)
-    for rec, tags in recording2tags.items():
-        rec_xml = ET.SubElement(rec_list, "{%s}recording" % NS)
-        rec_xml.set("{%s}id" % NS, rec)
-        taglist = ET.SubElement(rec_xml, "{%s}user-tag-list" % NS)
-        for tag in tags:
-            usertag_xml = ET.SubElement(taglist, "{%s}user-tag" % NS)
-            name_xml = ET.SubElement(usertag_xml, "{%s}name" % NS)
-            name_xml.text = tag
-    art_list = ET.SubElement(root, "{%s}artist-list" % NS)
-    for art, tags in artist2tags.items():
-        art_xml = ET.SubElement(art_list, "{%s}artist" % NS)
-        art_xml.set("{%s}id" % NS, art)
-        taglist = ET.SubElement(art_xml, "{%s}user-tag-list" % NS)
-        for tag in tags:
-            usertag_xml = ET.SubElement(taglist, "{%s}user-tag" % NS)
-            name_xml = ET.SubElement(usertag_xml, "{%s}name" % NS)
-            name_xml.text = tag
+    for entity_type in ['artist', 'label', 'place', 'recording', 'release', 'release_group', 'work']:
+        entity_tags = kwargs.pop(entity_type + '_tags', None)
+        if entity_tags is not None:
+            e_list = ET.SubElement(root, "{%s}%s-list" % (NS, entity_type.replace('_', '-')))
+            for e, tags in entity_tags.items():
+                e_xml = ET.SubElement(e_list, "{%s}%s" % (NS, entity_type.replace('_', '-')))
+                e_xml.set("{%s}id" % NS, e)
+                taglist = ET.SubElement(e_xml, "{%s}user-tag-list" % NS)
+                for tag in tags:
+                    usertag_xml = ET.SubElement(taglist, "{%s}user-tag" % NS)
+                    name_xml = ET.SubElement(usertag_xml, "{%s}name" % NS)
+                    name_xml.text = tag
+    if kwargs.keys():
+        raise TypeError("make_tag_request() got an unexpected keyword argument '%s'" % kwargs.popitem()[0])
 
     return ET.tostring(root, "utf-8")
 
-def make_rating_request(artist2rating, recording2rating):
+def make_rating_request(**kwargs):
     NS = "http://musicbrainz.org/ns/mmd-2.0#"
     root = ET.Element("{%s}metadata" % NS)
-    rec_list = ET.SubElement(root, "{%s}recording-list" % NS)
-    for rec, rating in recording2rating.items():
-        rec_xml = ET.SubElement(rec_list, "{%s}recording" % NS)
-        rec_xml.set("{%s}id" % NS, rec)
-        rating_xml = ET.SubElement(rec_xml, "{%s}user-rating" % NS)
-        rating_xml.text = str(rating)
-    art_list = ET.SubElement(root, "{%s}artist-list" % NS)
-    for art, rating in artist2rating.items():
-        art_xml = ET.SubElement(art_list, "{%s}artist" % NS)
-        art_xml.set("{%s}id" % NS, art)
-        rating_xml = ET.SubElement(art_xml, "{%s}user-rating" % NS)
-        rating_xml.text = str(rating)
+    for entity_type in ['artist', 'label', 'recording', 'release_group', 'work']:
+        entity_ratings = kwargs.pop(entity_type + '_ratings', None)
+        if entity_ratings is not None:
+            e_list = ET.SubElement(root, "{%s}%s-list" % (NS, entity_type.replace('_', '-')))
+            for e, rating in entity_ratings.items():
+                e_xml = ET.SubElement(e_list, "{%s}%s" % (NS, entity_type.replace('_', '-')))
+                e_xml.set("{%s}id" % NS, e)
+                rating_xml = ET.SubElement(e_xml, "{%s}user-rating" % NS)
+                rating_xml.text = str(rating)
+    if kwargs.keys():
+        raise TypeError("make_rating_request() got an unexpected keyword argument '%s'" % kwargs.popitem()[0])
 
     return ET.tostring(root, "utf-8")
 

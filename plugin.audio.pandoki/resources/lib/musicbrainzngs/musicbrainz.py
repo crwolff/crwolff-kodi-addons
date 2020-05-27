@@ -11,24 +11,23 @@ import socket
 import hashlib
 import locale
 import sys
+import json
 import xml.etree.ElementTree as etree
 from xml.parsers import expat
-from warnings import warn, simplefilter
+from warnings import warn
 
 from musicbrainzngs import mbxml
 from musicbrainzngs import util
 from musicbrainzngs import compat
 
-_version = "0.5"
+_version = "0.7.1"
 _log = logging.getLogger("musicbrainzngs")
 
-# turn on DeprecationWarnings below
-simplefilter(action="once", category=DeprecationWarning)
-
+LUCENE_SPECIAL = r'([+\-&|!(){}\[\]\^"~*?:\\\/])'
 
 # Constants for validation.
 
-RELATABLE_TYPES = ['area', 'artist', 'label', 'place', 'recording', 'release', 'release-group', 'url', 'work']
+RELATABLE_TYPES = ['area', 'artist', 'label', 'place', 'event', 'recording', 'release', 'release-group', 'series', 'url', 'work', 'instrument']
 RELATION_INCLUDES = [entity + '-rels' for entity in RELATABLE_TYPES]
 TAG_INCLUDES = ["tags", "user-tags"]
 RATING_INCLUDES = ["ratings", "user-ratings"]
@@ -43,48 +42,56 @@ VALID_INCLUDES = {
     'annotation': [
 
     ],
+    'instrument': ["aliases", "annotation"
+    ] + RELATION_INCLUDES + TAG_INCLUDES,
     'label': [
         "releases", # Subqueries
         "discids", "media",
         "aliases", "annotation"
     ] + RELATION_INCLUDES + TAG_INCLUDES + RATING_INCLUDES,
     'place' : ["aliases", "annotation"] + RELATION_INCLUDES + TAG_INCLUDES,
+    'event' : ["aliases"] + RELATION_INCLUDES + TAG_INCLUDES + RATING_INCLUDES,
     'recording': [
         "artists", "releases", # Subqueries
         "discids", "media", "artist-credits", "isrcs",
-        "annotation", "aliases"
+        "work-level-rels", "annotation", "aliases"
     ] + TAG_INCLUDES + RATING_INCLUDES + RELATION_INCLUDES,
     'release': [
         "artists", "labels", "recordings", "release-groups", "media",
-        "artist-credits", "discids", "puids", "isrcs",
+        "artist-credits", "discids", "isrcs",
         "recording-level-rels", "work-level-rels", "annotation", "aliases"
-    ] + RELATION_INCLUDES,
+    ] + TAG_INCLUDES + RELATION_INCLUDES,
     'release-group': [
         "artists", "releases", "discids", "media",
         "artist-credits", "annotation", "aliases"
     ] + TAG_INCLUDES + RATING_INCLUDES + RELATION_INCLUDES,
+    'series': [
+        "annotation", "aliases"
+    ] + RELATION_INCLUDES,
     'work': [
-        "artists", # Subqueries
         "aliases", "annotation"
     ] + TAG_INCLUDES + RATING_INCLUDES + RELATION_INCLUDES,
     'url': RELATION_INCLUDES,
-    'discid': [
+    'discid': [ # Discid should be the same as release
         "artists", "labels", "recordings", "release-groups", "media",
-        "artist-credits", "discids", "puids", "isrcs",
-        "recording-level-rels", "work-level-rels"
+        "artist-credits", "discids", "isrcs",
+        "recording-level-rels", "work-level-rels", "annotation", "aliases"
     ] + RELATION_INCLUDES,
-    'isrc': ["artists", "releases", "puids", "isrcs"],
+    'isrc': ["artists", "releases", "isrcs"],
     'iswc': ["artists"],
     'collection': ['releases'],
 }
 VALID_BROWSE_INCLUDES = {
-    'releases': ["artist-credits", "labels", "recordings", "isrcs",
+    'artist': ["aliases"] + TAG_INCLUDES + RATING_INCLUDES + RELATION_INCLUDES,
+    'event': ["aliases"] + TAG_INCLUDES + RATING_INCLUDES + RELATION_INCLUDES,
+    'label': ["aliases"] + TAG_INCLUDES + RATING_INCLUDES + RELATION_INCLUDES,
+    'recording': ["artist-credits", "isrcs"] + TAG_INCLUDES + RATING_INCLUDES + RELATION_INCLUDES,
+    'release': ["artist-credits", "labels", "recordings", "isrcs",
                 "release-groups", "media", "discids"] + RELATION_INCLUDES,
-    'recordings': ["artist-credits", "isrcs"] + TAG_INCLUDES + RATING_INCLUDES + RELATION_INCLUDES,
-    'labels': ["aliases"] + TAG_INCLUDES + RATING_INCLUDES + RELATION_INCLUDES,
-    'artists': ["aliases"] + TAG_INCLUDES + RATING_INCLUDES + RELATION_INCLUDES,
-    'urls': RELATION_INCLUDES,
-    'release-groups': ["artist-credits"] + TAG_INCLUDES + RATING_INCLUDES + RELATION_INCLUDES
+    'place': ["aliases"] + TAG_INCLUDES + RELATION_INCLUDES,
+    'release-group': ["artist-credits"] + TAG_INCLUDES + RATING_INCLUDES + RELATION_INCLUDES,
+    'url': RELATION_INCLUDES,
+    'work': ["aliases", "annotation"] + TAG_INCLUDES + RATING_INCLUDES + RELATION_INCLUDES,
 }
 
 #: These can be used to filter whenever releases are includes or browsed
@@ -100,43 +107,65 @@ VALID_SEARCH_FIELDS = {
     'annotation': [
         'entity', 'name', 'text', 'type'
     ],
+    'area': [
+        'aid', 'alias', 'area', 'areaaccent', 'begin', 'comment', 'end',
+        'ended', 'iso', 'iso1', 'iso2', 'iso3', 'sortname', 'tag', 'type'
+    ],
     'artist': [
-        'arid', 'artist', 'artistaccent', 'alias', 'begin', 'comment',
-        'country', 'end', 'ended', 'gender', 'ipi', 'sortname', 'tag', 'type',
-        'area', 'beginarea', 'endarea'
+        'alias', 'area', 'arid', 'artist', 'artistaccent', 'begin', 'beginarea',
+        'comment', 'country', 'end', 'endarea', 'ended', 'gender',
+        'ipi', 'isni', 'primary_alias', 'sortname', 'tag', 'type'
+    ],
+    'event': [
+        'aid', 'alias', 'area', 'arid', 'artist', 'begin', 'comment', 'eid',
+        'end', 'ended', 'event', 'eventaccent', 'pid', 'place', 'tag', 'type'
+    ],
+    'instrument': [
+        'alias', 'comment', 'description', 'iid', 'instrument',
+        'instrumentaccent', 'tag', 'type'
     ],
     'label': [
-        'alias', 'begin', 'code', 'comment', 'country', 'end', 'ended',
-        'ipi', 'label', 'labelaccent', 'laid', 'sortname', 'type', 'tag',
-        'area'
-    ],
-    'recording': [
-        'arid', 'artist', 'artistname', 'creditname', 'comment',
-        'country', 'date', 'dur', 'format', 'isrc', 'number',
-        'position', 'primarytype', 'puid', 'qdur', 'recording',
-        'recordingaccent', 'reid', 'release', 'rgid', 'rid',
-        'secondarytype', 'status', 'tnum', 'tracks', 'tracksrelease',
-        'tag', 'type', 'video'
-    ],
-    'release-group': [
-        'arid', 'artist', 'artistname', 'comment', 'creditname',
-        'primarytype', 'rgid', 'releasegroup', 'releasegroupaccent',
-        'releases', 'release', 'reid', 'secondarytype', 'status',
+        'alias', 'area', 'begin', 'code', 'comment', 'country', 'end', 'ended',
+        'ipi', 'label', 'labelaccent', 'laid', 'release_count', 'sortname',
         'tag', 'type'
     ],
+    'place': [
+        'address', 'alias', 'area', 'begin', 'comment', 'end', 'ended', 'lat', 'long',
+        'pid', 'place', 'placeaccent', 'type'
+    ],
+    'recording': [
+        'alias', 'arid', 'artist', 'artistname', 'comment', 'country',
+        'creditname', 'date', 'dur', 'format', 'isrc', 'number', 'position',
+        'primarytype', 'qdur', 'recording', 'recordingaccent', 'reid',
+        'release', 'rgid', 'rid', 'secondarytype', 'status', 'tag', 'tid',
+        'tnum', 'tracks', 'tracksrelease', 'type', 'video'],
+
+    'release-group': [
+        'alias', 'arid', 'artist', 'artistname', 'comment', 'creditname',
+        'primarytype', 'reid', 'release', 'releasegroup', 'releasegroupaccent',
+        'releases', 'rgid', 'secondarytype', 'status', 'tag', 'type'
+    ],
     'release': [
-        'arid', 'artist', 'artistname', 'asin', 'barcode', 'creditname',
-        'catno', 'comment', 'country', 'creditname', 'date', 'discids',
-        'discidsmedium', 'format', 'laid', 'label', 'lang', 'mediums',
-        'primarytype', 'puid', 'quality', 'reid', 'release', 'releaseaccent',
-        'rgid', 'script', 'secondarytype', 'status', 'tag', 'tracks',
-        'tracksmedium', 'type'
+        'alias', 'arid', 'artist', 'artistname', 'asin', 'barcode', 'catno',
+        'comment', 'country', 'creditname', 'date', 'discids', 'discidsmedium',
+        'format', 'label', 'laid', 'lang', 'mediums', 'primarytype', 'quality',
+        'reid', 'release', 'releaseaccent', 'rgid', 'script', 'secondarytype',
+        'status', 'tag', 'tracks', 'tracksmedium', 'type'
+    ],
+    'series': [
+        'alias', 'comment', 'orderingattribute', 'series', 'seriesaccent',
+        'sid', 'tag', 'type'
     ],
     'work': [
-        'alias', 'arid', 'artist', 'comment', 'iswc', 'lang', 'tag',
-        'type', 'wid', 'work', 'workaccent'
-    ],
+        'alias', 'arid', 'artist', 'comment', 'iswc', 'lang', 'recording',
+        'recording_count', 'rid', 'tag', 'type', 'wid', 'work', 'workaccent'
+    ]
 }
+
+# Constants
+class AUTH_YES: pass
+class AUTH_NO: pass
+class AUTH_IFSET: pass
 
 
 # Exceptions.
@@ -244,21 +273,24 @@ def _check_filter_and_make_params(entity, includes, release_status=[], release_t
         params["type"] = "|".join(release_type)
     return params
 
-def _docstring(entity, browse=False):
+def _docstring_get(entity):
+    includes = list(VALID_INCLUDES.get(entity, []))
+    return _docstring_impl("includes", includes)
+
+def _docstring_browse(entity):
+    includes = list(VALID_BROWSE_INCLUDES.get(entity, []))
+    return _docstring_impl("includes", includes)
+
+def _docstring_search(entity):
+    search_fields = list(VALID_SEARCH_FIELDS.get(entity, []))
+    return _docstring_impl("fields", search_fields)
+
+def _docstring_impl(name, values):
     def _decorator(func):
-        if browse:
-            includes = list(VALID_BROWSE_INCLUDES.get(entity, []))
-        else:
-            includes = list(VALID_INCLUDES.get(entity, []))
-        # puids are allowed so nothing breaks, but not documented
-        if "puids" in includes: includes.remove("puids")
-        includes = ", ".join(includes)
+        vstr = ", ".join(values)
+        args = {name: vstr}
         if func.__doc__:
-            search_fields = list(VALID_SEARCH_FIELDS.get(entity, []))
-            # puid is allowed so nothing breaks, but not documented
-            if "puid" in search_fields: search_fields.remove("puid")
-            func.__doc__ = func.__doc__.format(includes=includes,
-                    fields=", ".join(search_fields))
+            func.__doc__ = func.__doc__.format(**args)
         return func
 
     return _decorator
@@ -268,6 +300,7 @@ def _docstring(entity, browse=False):
 
 user = password = ""
 hostname = "musicbrainz.org"
+https = True
 _client = ""
 _useragent = ""
 
@@ -292,11 +325,21 @@ def set_useragent(app, version, contact=None):
     _client = "%s-%s" % (app, version)
     _log.debug("set user-agent to %s" % _useragent)
 
-def set_hostname(new_hostname):
-    """Set the base hostname for MusicBrainz webservice requests.
-    Defaults to 'musicbrainz.org'."""
+
+def set_hostname(new_hostname, use_https=False):
+    """Set the hostname for MusicBrainz webservice requests.
+    Defaults to 'musicbrainz.org', accessing over https.
+    For backwards compatibility, `use_https` is False by default.
+
+    :param str new_hostname: The hostname (and port) of the MusicBrainz server to connect to
+    :param bool use_https: `True` if the host should be accessed using https. Default is `False`
+
+    Specify a non-standard port by adding it to the hostname,
+    for example 'localhost:8000'."""
     global hostname
+    global https
     hostname = new_hostname
+    https = use_https
 
 # Rate limiting.
 
@@ -542,30 +585,35 @@ def set_format(fmt="xml"):
     """Sets the format that should be returned by the Web Service.
     The server currently supports `xml` and `json`.
 
-    When you set the format to anything different from the default,
-    you need to provide your own parser with :func:`set_parser`.
+    This method will set a default parser for the specified format,
+    but you can modify it with :func:`set_parser`.
 
     .. warning:: The json format used by the server is different from
         the json format returned by the `musicbrainzngs` internal parser
-        when using the `xml` format!
+        when using the `xml` format! This format may change at any time.
     """
     global ws_format
-    if fmt not in ["xml", "json"]:
-        raise ValueError("invalid format: %s" % fmt)
-    else:
+    if fmt == "xml":
         ws_format = fmt
+        set_parser() # set to default
+    elif fmt == "json":
+        ws_format = fmt
+        warn("The json format is non-official and may change at any time")
+        set_parser(json.loads)
+    else:
+        raise ValueError("invalid format: %s" % fmt)
 
 
 @_rate_limit
-def _mb_request(path, method='GET', auth_required=False, client_required=False,
-                args=None, data=None, body=None):
+def _mb_request(path, method='GET', auth_required=AUTH_NO,
+                client_required=False, args=None, data=None, body=None):
     """Makes a request for the specified `path` (endpoint) on /ws/2 on
     the globally-specified hostname. Parses the responses and returns
     the resulting object.  `auth_required` and `client_required` control
-    whether exceptions should be raised if the client and
-    username/password are left unspecified, respectively.
+    whether exceptions should be raised if the username/password and
+    client are left unspecified, respectively.
     """
-    global parser_fun 
+    global parser_fun
 
     if args is None:
         args = {}
@@ -595,7 +643,7 @@ def _mb_request(path, method='GET', auth_required=False, client_required=False,
     # Construct the full URL for the request, including hostname and
     # query string.
     url = compat.urlunparse((
-        'http',
+        'https' if https else 'http',
         hostname,
         '/ws/2/%s' % path,
         '',
@@ -609,11 +657,19 @@ def _mb_request(path, method='GET', auth_required=False, client_required=False,
     handlers = [httpHandler]
 
     # Add credentials if required.
-    if auth_required:
+    add_auth = False
+    if auth_required == AUTH_YES:
         _log.debug("Auth required for %s" % url)
         if not user:
             raise UsageError("authorization required; "
                              "use auth(user, pass) first")
+        add_auth = True
+
+    if auth_required == AUTH_IFSET and user:
+        _log.debug("Using auth for %s because user and pass is set" % url)
+        add_auth = True
+
+    if add_auth:
         passwordMgr = _RedirectPasswordMgr()
         authHandler = _DigestAuthHandler(passwordMgr)
         authHandler.add_password("musicbrainz.org", (), user, password)
@@ -635,16 +691,19 @@ def _mb_request(path, method='GET', auth_required=False, client_required=False,
 
     return parser_fun(resp)
 
-def _is_auth_required(entity, includes):
-	""" Some calls require authentication. This returns
-	True if a call does, False otherwise
-	"""
-	if "user-tags" in includes or "user-ratings" in includes:
-		return True
-	elif entity.startswith("collection"):
-		return True
-	else:
-		return False
+def _get_auth_type(entity, id, includes):
+    """ Some calls require authentication. This returns
+    True if a call does, False otherwise
+    """
+    if "user-tags" in includes or "user-ratings" in includes:
+        return AUTH_YES
+    elif entity.startswith("collection"):
+        if not id:
+            return AUTH_YES
+        else:
+            return AUTH_IFSET
+    else:
+        return AUTH_NO
 
 def _do_mb_query(entity, id, includes=[], params={}):
 	"""Make a single GET call to the MusicBrainz XML API. `entity` is a
@@ -658,7 +717,7 @@ def _do_mb_query(entity, id, includes=[], params={}):
 	if not isinstance(includes, list):
 		includes = [includes]
 	_check_includes(entity, includes)
-	auth_required = _is_auth_required(entity, includes)
+	auth_required = _get_auth_type(entity, id, includes)
 	args = dict(params)
 	if len(includes) > 0:
 		inc = " ".join(includes)
@@ -681,8 +740,8 @@ def _do_mb_search(entity, query='', fields={},
 	if query:
 		clean_query = util._unicode(query)
 		if fields:
-			clean_query = re.sub(r'([+\-&|!(){}\[\]\^"~*?:\\])',
-					r'\\\1', clean_query)
+			clean_query = re.sub(LUCENE_SPECIAL, r'\\\1',
+					     clean_query)
 			if strict:
 				query_parts.append('"%s"' % clean_query)
 			else:
@@ -695,14 +754,10 @@ def _do_mb_search(entity, query='', fields={},
 			raise InvalidSearchFieldError(
 				'%s is not a valid search field for %s' % (key, entity)
 			)
-		elif key == "puid":
-			warn("PUID support was removed from server\n"
-			     "the 'puid' field is ignored",
-			     DeprecationWarning, stacklevel=2)
 
 		# Escape Lucene's special characters.
 		value = util._unicode(value)
-		value = re.sub(r'([+\-&|!(){}\[\]\^"~*?:\\\/])', r'\\\1', value)
+		value = re.sub(LUCENE_SPECIAL, r'\\\1', value)
 		if value:
 			if strict:
 				query_parts.append('%s:"%s"' % (key, value))
@@ -729,25 +784,25 @@ def _do_mb_search(entity, query='', fields={},
 def _do_mb_delete(path):
 	"""Send a DELETE request for the specified object.
 	"""
-	return _mb_request(path, 'DELETE', True, True)
+	return _mb_request(path, 'DELETE', AUTH_YES, True)
 
 def _do_mb_put(path):
 	"""Send a PUT request for the specified object.
 	"""
-	return _mb_request(path, 'PUT', True, True)
+	return _mb_request(path, 'PUT', AUTH_YES, True)
 
 def _do_mb_post(path, body):
 	"""Perform a single POST call for an endpoint with a specified
 	request body.
 	"""
-	return _mb_request(path, 'POST', True, True, body=body)
+	return _mb_request(path, 'POST', AUTH_YES, True, body=body)
 
 
 # The main interface!
 
 # Single entity by ID
 
-@_docstring('area')
+@_docstring_get("area")
 def get_area_by_id(id, includes=[], release_status=[], release_type=[]):
     """Get the area with the MusicBrainz `id` as a dict with an 'area' key.
 
@@ -756,7 +811,7 @@ def get_area_by_id(id, includes=[], release_status=[], release_type=[]):
                                            release_status, release_type)
     return _do_mb_query("area", id, includes, params)
 
-@_docstring('artist')
+@_docstring_get("artist")
 def get_artist_by_id(id, includes=[], release_status=[], release_type=[]):
     """Get the artist with the MusicBrainz `id` as a dict with an 'artist' key.
 
@@ -765,7 +820,16 @@ def get_artist_by_id(id, includes=[], release_status=[], release_type=[]):
                                            release_status, release_type)
     return _do_mb_query("artist", id, includes, params)
 
-@_docstring('label')
+@_docstring_get("instrument")
+def get_instrument_by_id(id, includes=[], release_status=[], release_type=[]):
+    """Get the instrument with the MusicBrainz `id` as a dict with an 'artist' key.
+
+    *Available includes*: {includes}"""
+    params = _check_filter_and_make_params("instrument", includes,
+                                           release_status, release_type)
+    return _do_mb_query("instrument", id, includes, params)
+
+@_docstring_get("label")
 def get_label_by_id(id, includes=[], release_status=[], release_type=[]):
     """Get the label with the MusicBrainz `id` as a dict with a 'label' key.
 
@@ -774,7 +838,7 @@ def get_label_by_id(id, includes=[], release_status=[], release_type=[]):
                                            release_status, release_type)
     return _do_mb_query("label", id, includes, params)
 
-@_docstring('place')
+@_docstring_get("place")
 def get_place_by_id(id, includes=[], release_status=[], release_type=[]):
     """Get the place with the MusicBrainz `id` as a dict with an 'place' key.
 
@@ -783,7 +847,19 @@ def get_place_by_id(id, includes=[], release_status=[], release_type=[]):
                                            release_status, release_type)
     return _do_mb_query("place", id, includes, params)
 
-@_docstring('recording')
+@_docstring_get("event")
+def get_event_by_id(id, includes=[], release_status=[], release_type=[]):
+    """Get the event with the MusicBrainz `id` as a dict with an 'event' key.
+
+    The event dict has the following keys:
+    `id`, `type`, `name`, `time`, `disambiguation` and `life-span`.
+
+    *Available includes*: {includes}"""
+    params = _check_filter_and_make_params("event", includes,
+                                           release_status, release_type)
+    return _do_mb_query("event", id, includes, params)
+
+@_docstring_get("recording")
 def get_recording_by_id(id, includes=[], release_status=[], release_type=[]):
     """Get the recording with the MusicBrainz `id` as a dict
     with a 'recording' key.
@@ -793,7 +869,7 @@ def get_recording_by_id(id, includes=[], release_status=[], release_type=[]):
                                            release_status, release_type)
     return _do_mb_query("recording", id, includes, params)
 
-@_docstring('release')
+@_docstring_get("release")
 def get_release_by_id(id, includes=[], release_status=[], release_type=[]):
     """Get the release with the MusicBrainz `id` as a dict with a 'release' key.
 
@@ -802,7 +878,7 @@ def get_release_by_id(id, includes=[], release_status=[], release_type=[]):
                                            release_status, release_type)
     return _do_mb_query("release", id, includes, params)
 
-@_docstring('release-group')
+@_docstring_get("release-group")
 def get_release_group_by_id(id, includes=[],
                             release_status=[], release_type=[]):
     """Get the release group with the MusicBrainz `id` as a dict
@@ -813,14 +889,21 @@ def get_release_group_by_id(id, includes=[],
                                            release_status, release_type)
     return _do_mb_query("release-group", id, includes, params)
 
-@_docstring('work')
+@_docstring_get("series")
+def get_series_by_id(id, includes=[]):
+    """Get the series with the MusicBrainz `id` as a dict with a 'series' key.
+
+    *Available includes*: {includes}"""
+    return _do_mb_query("series", id, includes)
+
+@_docstring_get("work")
 def get_work_by_id(id, includes=[]):
     """Get the work with the MusicBrainz `id` as a dict with a 'work' key.
 
     *Available includes*: {includes}"""
     return _do_mb_query("work", id, includes)
 
-@_docstring('url')
+@_docstring_get("url")
 def get_url_by_id(id, includes=[]):
     """Get the url with the MusicBrainz `id` as a dict with a 'url' key.
 
@@ -830,28 +913,56 @@ def get_url_by_id(id, includes=[]):
 
 # Searching
 
-@_docstring('annotation')
+@_docstring_search("annotation")
 def search_annotations(query='', limit=None, offset=None, strict=False, **fields):
     """Search for annotations and return a dict with an 'annotation-list' key.
 
     *Available search fields*: {fields}"""
     return _do_mb_search('annotation', query, fields, limit, offset, strict)
 
-@_docstring('artist')
+@_docstring_search("area")
+def search_areas(query='', limit=None, offset=None, strict=False, **fields):
+    """Search for areas and return a dict with an 'area-list' key.
+
+    *Available search fields*: {fields}"""
+    return _do_mb_search('area', query, fields, limit, offset, strict)
+
+@_docstring_search("artist")
 def search_artists(query='', limit=None, offset=None, strict=False, **fields):
     """Search for artists and return a dict with an 'artist-list' key.
 
     *Available search fields*: {fields}"""
     return _do_mb_search('artist', query, fields, limit, offset, strict)
 
-@_docstring('label')
+@_docstring_search("event")
+def search_events(query='', limit=None, offset=None, strict=False, **fields):
+    """Search for events and return a dict with an 'event-list' key.
+
+    *Available search fields*: {fields}"""
+    return _do_mb_search('event', query, fields, limit, offset, strict)
+
+@_docstring_search("instrument")
+def search_instruments(query='', limit=None, offset=None, strict=False, **fields):
+    """Search for instruments and return a dict with a 'instrument-list' key.
+
+    *Available search fields*: {fields}"""
+    return _do_mb_search('instrument', query, fields, limit, offset, strict)
+
+@_docstring_search("label")
 def search_labels(query='', limit=None, offset=None, strict=False, **fields):
     """Search for labels and return a dict with a 'label-list' key.
 
     *Available search fields*: {fields}"""
     return _do_mb_search('label', query, fields, limit, offset, strict)
 
-@_docstring('recording')
+@_docstring_search("place")
+def search_places(query='', limit=None, offset=None, strict=False, **fields):
+    """Search for places and return a dict with a 'place-list' key.
+
+    *Available search fields*: {fields}"""
+    return _do_mb_search('place', query, fields, limit, offset, strict)
+
+@_docstring_search("recording")
 def search_recordings(query='', limit=None, offset=None,
                       strict=False, **fields):
     """Search for recordings and return a dict with a 'recording-list' key.
@@ -859,14 +970,14 @@ def search_recordings(query='', limit=None, offset=None,
     *Available search fields*: {fields}"""
     return _do_mb_search('recording', query, fields, limit, offset, strict)
 
-@_docstring('release')
+@_docstring_search("release")
 def search_releases(query='', limit=None, offset=None, strict=False, **fields):
     """Search for recordings and return a dict with a 'recording-list' key.
 
     *Available search fields*: {fields}"""
     return _do_mb_search('release', query, fields, limit, offset, strict)
 
-@_docstring('release-group')
+@_docstring_search("release-group")
 def search_release_groups(query='', limit=None, offset=None,
 			  strict=False, **fields):
     """Search for release groups and return a dict
@@ -875,7 +986,14 @@ def search_release_groups(query='', limit=None, offset=None,
     *Available search fields*: {fields}"""
     return _do_mb_search('release-group', query, fields, limit, offset, strict)
 
-@_docstring('work')
+@_docstring_search("series")
+def search_series(query='', limit=None, offset=None, strict=False, **fields):
+    """Search for series and return a dict with a 'series-list' key.
+
+    *Available search fields*: {fields}"""
+    return _do_mb_search('series', query, fields, limit, offset, strict)
+
+@_docstring_search("work")
 def search_works(query='', limit=None, offset=None, strict=False, **fields):
     """Search for works and return a dict with a 'work-list' key.
 
@@ -884,22 +1002,29 @@ def search_works(query='', limit=None, offset=None, strict=False, **fields):
 
 
 # Lists of entities
-@_docstring('release')
-def get_releases_by_discid(id, includes=[], toc=None, cdstubs=True):
-    """Search for releases with a :musicbrainz:`Disc ID`.
+@_docstring_get("discid")
+def get_releases_by_discid(id, includes=[], toc=None, cdstubs=True, media_format=None):
+    """Search for releases with a :musicbrainz:`Disc ID` or table of contents.
 
     When a `toc` is provided and no release with the disc ID is found,
     a fuzzy search by the toc is done.
     The `toc` should have to same format as :attr:`discid.Disc.toc_string`.
+    When a `toc` is provided, the format of the discid itself is not
+    checked server-side, so any value may be passed if searching by only
+    `toc` is desired.
 
     If no toc matches in musicbrainz but a :musicbrainz:`CD Stub` does,
-    the CD Stub will be returned. Prevent this from happening by 
+    the CD Stub will be returned. Prevent this from happening by
     passing `cdstubs=False`.
+
+    By default only results that match a format that allows discids
+    (e.g. CD) are included. To include all media formats, pass
+    `media_format='all'`.
 
     The result is a dict with either a 'disc' , a 'cdstub' key
     or a 'release-list' (fuzzy match with TOC).
-    A 'disc' has a 'release-list' and a 'cdstub' key has direct 'artist'
-    and 'title' keys.
+    A 'disc' has an 'offset-count', an 'offset-list' and a 'release-list'.
+    A 'cdstub' key has direct 'artist' and 'title' keys.
 
     *Available includes*: {includes}"""
     params = _check_filter_and_make_params("discid", includes, release_status=[],
@@ -908,31 +1033,12 @@ def get_releases_by_discid(id, includes=[], toc=None, cdstubs=True):
         params["toc"] = toc
     if not cdstubs:
         params["cdstubs"] = "no"
+    if media_format:
+        params["media-format"] = media_format
     return _do_mb_query("discid", id, includes, params)
 
-@_docstring('recording')
-def get_recordings_by_echoprint(echoprint, includes=[], release_status=[],
-                                release_type=[]):
-    """Search for recordings with an `echoprint <http://echoprint.me>`_.
-    (not available on server)"""
-    warn("Echoprints were never introduced\n"
-         "and will not be found (404)",
-         DeprecationWarning, stacklevel=2)
-    raise ResponseError(cause=compat.HTTPError(
-                                            None, 404, "Not Found", None, None))
 
-@_docstring('recording')
-def get_recordings_by_puid(puid, includes=[], release_status=[],
-                           release_type=[]):
-    """Search for recordings with a :musicbrainz:`PUID`.
-    (not available on server)"""
-    warn("PUID support was removed from the server\n"
-         "and no PUIDs will be found (404)",
-         DeprecationWarning, stacklevel=2)
-    raise ResponseError(cause=compat.HTTPError(
-                                            None, 404, "Not Found", None, None))
-
-@_docstring('recording')
+@_docstring_get("recording")
 def get_recordings_by_isrc(isrc, includes=[], release_status=[],
                            release_type=[]):
     """Search for recordings with an :musicbrainz:`ISRC`.
@@ -944,7 +1050,7 @@ def get_recordings_by_isrc(isrc, includes=[], release_status=[],
                                            release_status, release_type)
     return _do_mb_query("isrc", isrc, includes, params)
 
-@_docstring('work')
+@_docstring_get("work")
 def get_works_by_iswc(iswc, includes=[]):
     """Search for works with an :musicbrainz:`ISWC`.
     The result is a dict with a`work-list`.
@@ -953,7 +1059,9 @@ def get_works_by_iswc(iswc, includes=[]):
     return _do_mb_query("iswc", iswc, includes)
 
 
-def _browse_impl(entity, includes, valid_includes, limit, offset, params, release_status=[], release_type=[]):
+def _browse_impl(entity, includes, limit, offset, params, release_status=[], release_type=[]):
+    includes = includes if isinstance(includes, list) else [includes]
+    valid_includes = VALID_BROWSE_INCLUDES[entity]
     _check_includes_impl(includes, valid_includes)
     p = {}
     for k,v in params.items():
@@ -970,45 +1078,59 @@ def _browse_impl(entity, includes, valid_includes, limit, offset, params, releas
 # Browse methods
 # Browse include are a subset of regular get includes, so we check them here
 # and the test in _do_mb_query will pass anyway.
-@_docstring('artists', browse=True)
+@_docstring_browse("artist")
 def browse_artists(recording=None, release=None, release_group=None,
-                   includes=[], limit=None, offset=None):
+                   work=None, includes=[], limit=None, offset=None):
     """Get all artists linked to a recording, a release or a release group.
     You need to give one MusicBrainz ID.
 
     *Available includes*: {includes}"""
-    # optional parameter work?
-    valid_includes = VALID_BROWSE_INCLUDES['artists']
     params = {"recording": recording,
               "release": release,
-              "release-group": release_group}
-    return _browse_impl("artist", includes, valid_includes,
-                        limit, offset, params)
+              "release-group": release_group,
+              "work": work}
+    return _browse_impl("artist", includes, limit, offset, params)
 
-@_docstring('labels', browse=True)
+@_docstring_browse("event")
+def browse_events(area=None, artist=None, place=None,
+                   includes=[], limit=None, offset=None):
+    """Get all events linked to a area, a artist or a place.
+    You need to give one MusicBrainz ID.
+
+    *Available includes*: {includes}"""
+    params = {"area": area,
+              "artist": artist,
+              "place": place}
+    return _browse_impl("event", includes, limit, offset, params)
+
+@_docstring_browse("label")
 def browse_labels(release=None, includes=[], limit=None, offset=None):
     """Get all labels linked to a relase. You need to give a MusicBrainz ID.
 
     *Available includes*: {includes}"""
-    valid_includes = VALID_BROWSE_INCLUDES['labels']
     params = {"release": release}
-    return _browse_impl("label", includes, valid_includes,
-                        limit, offset, params)
+    return _browse_impl("label", includes, limit, offset, params)
 
-@_docstring('recordings', browse=True)
+@_docstring_browse("place")
+def browse_places(area=None, includes=[], limit=None, offset=None):
+    """Get all places linked to an area. You need to give a MusicBrainz ID.
+
+    *Available includes*: {includes}"""
+    params = {"area": area}
+    return _browse_impl("place", includes, limit, offset, params)
+
+@_docstring_browse("recording")
 def browse_recordings(artist=None, release=None, includes=[],
                       limit=None, offset=None):
     """Get all recordings linked to an artist or a release.
     You need to give one MusicBrainz ID.
 
     *Available includes*: {includes}"""
-    valid_includes = VALID_BROWSE_INCLUDES['recordings']
     params = {"artist": artist,
               "release": release}
-    return _browse_impl("recording", includes, valid_includes,
-                        limit, offset, params)
+    return _browse_impl("recording", includes, limit, offset, params)
 
-@_docstring('releases', browse=True)
+@_docstring_browse("release")
 def browse_releases(artist=None, track_artist=None, label=None, recording=None,
                     release_group=None, release_status=[], release_type=[],
                     includes=[], limit=None, offset=None):
@@ -1023,16 +1145,15 @@ def browse_releases(artist=None, track_artist=None, label=None, recording=None,
 
     *Available includes*: {includes}"""
     # track_artist param doesn't work yet
-    valid_includes = VALID_BROWSE_INCLUDES['releases']
     params = {"artist": artist,
               "track_artist": track_artist,
               "label": label,
               "recording": recording,
               "release-group": release_group}
-    return _browse_impl("release", includes, valid_includes, limit, offset,
+    return _browse_impl("release", includes, limit, offset,
                         params, release_status, release_type)
 
-@_docstring('release-groups', browse=True)
+@_docstring_browse("release-group")
 def browse_release_groups(artist=None, release=None, release_type=[],
                           includes=[], limit=None, offset=None):
     """Get all release groups linked to an artist or a release.
@@ -1041,25 +1162,27 @@ def browse_release_groups(artist=None, release=None, release_type=[],
     You can filter by :data:`musicbrainz.VALID_RELEASE_TYPES`.
 
     *Available includes*: {includes}"""
-    valid_includes = VALID_BROWSE_INCLUDES['release-groups']
     params = {"artist": artist,
               "release": release}
-    return _browse_impl("release-group", includes, valid_includes,
-                        limit, offset, params, [], release_type)
+    return _browse_impl("release-group", includes, limit,
+                        offset, params, [], release_type)
 
-@_docstring('urls', browse=True)
+@_docstring_browse("url")
 def browse_urls(resource=None, includes=[], limit=None, offset=None):
     """Get urls by actual URL string.
     You need to give a URL string as 'resource'
 
     *Available includes*: {includes}"""
-    # optional parameter work?
-    valid_includes = VALID_BROWSE_INCLUDES['urls']
     params = {"resource": resource}
-    return _browse_impl("url", includes, valid_includes,
-                        limit, offset, params)
+    return _browse_impl("url", includes, limit, offset, params)
 
-# browse_work is defined in the docs but has no browse criteria
+@_docstring_browse("work")
+def browse_works(artist=None, includes=[], limit=None, offset=None):
+    """Get all works linked to an artist
+
+    *Available includes*: {includes}"""
+    params = {"artist": artist}
+    return _browse_impl("work", includes, limit, offset, params)
 
 # Collections
 def get_collections():
@@ -1068,16 +1191,59 @@ def get_collections():
     # Missing <release-list count="n"> the count in the reply
     return _do_mb_query("collection", '')
 
+def _do_collection_query(collection, collection_type, limit, offset):
+    params = {}
+    if limit: params["limit"] = limit
+    if offset: params["offset"] = offset
+    return _do_mb_query("collection", "%s/%s" % (collection, collection_type), [], params)
+
+def get_artists_in_collection(collection, limit=None, offset=None):
+    """List the artists in a collection.
+    Returns a dict with a 'collection' key, which again has a 'artist-list'.
+
+    See `Browsing`_ for how to use `limit` and `offset`.
+    """
+    return _do_collection_query(collection, "artists", limit, offset)
+
 def get_releases_in_collection(collection, limit=None, offset=None):
     """List the releases in a collection.
     Returns a dict with a 'collection' key, which again has a 'release-list'.
 
     See `Browsing`_ for how to use `limit` and `offset`.
     """
-    params = {}
-    if limit: params["limit"] = limit
-    if offset: params["offset"] = offset
-    return _do_mb_query("collection", "%s/releases" % collection, [], params)
+    return _do_collection_query(collection, "releases", limit, offset)
+
+def get_events_in_collection(collection, limit=None, offset=None):
+    """List the events in a collection.
+    Returns a dict with a 'collection' key, which again has a 'event-list'.
+
+    See `Browsing`_ for how to use `limit` and `offset`.
+    """
+    return _do_collection_query(collection, "events", limit, offset)
+
+def get_places_in_collection(collection, limit=None, offset=None):
+    """List the places in a collection.
+    Returns a dict with a 'collection' key, which again has a 'place-list'.
+
+    See `Browsing`_ for how to use `limit` and `offset`.
+    """
+    return _do_collection_query(collection, "places", limit, offset)
+
+def get_recordings_in_collection(collection, limit=None, offset=None):
+    """List the recordings in a collection.
+    Returns a dict with a 'collection' key, which again has a 'recording-list'.
+
+    See `Browsing`_ for how to use `limit` and `offset`.
+    """
+    return _do_collection_query(collection, "recordings", limit, offset)
+
+def get_works_in_collection(collection, limit=None, offset=None):
+    """List the works in a collection.
+    Returns a dict with a 'collection' key, which again has a 'work-list'.
+
+    See `Browsing`_ for how to use `limit` and `offset`.
+    """
+    return _do_collection_query(collection, "works", limit, offset)
 
 
 # Submission methods
@@ -1087,23 +1253,6 @@ def submit_barcodes(release_barcode):
     query = mbxml.make_barcode_request(release_barcode)
     return _do_mb_post("release", query)
 
-def submit_puids(recording_puids):
-    """Submit PUIDs.
-    (Functionality removed from server)
-    """
-    warn("PUID support was dropped at the server\n"
-         "nothing will be submitted",
-         DeprecationWarning, stacklevel=2)
-    return {'message': {'text': 'OK'}}
-
-def submit_echoprints(recording_echoprints):
-    """Submit echoprints.
-    (Functionality removed from server)
-    """
-    warn("Echoprints were never introduced\n"
-         "nothing will be submitted",
-         DeprecationWarning, stacklevel=2)
-    return {'message': {'text': 'OK'}}
 
 def submit_isrcs(recording_isrcs):
     """Submit ISRCs.
@@ -1116,20 +1265,35 @@ def submit_isrcs(recording_isrcs):
     query = mbxml.make_isrc_request(rec2isrcs)
     return _do_mb_post("recording", query)
 
-def submit_tags(artist_tags={}, recording_tags={}):
+def submit_tags(**kwargs):
     """Submit user tags.
-    Artist or recording parameters are of the form:
+    Takes parameters named e.g. 'artist_tags', 'recording_tags', etc.,
+    and of the form:
     {entity_id1: [tag1, ...], ...}
+    If you only have one tag for an entity you can use a string instead
+    of a list.
+
+    The user's tags for each entity will be set to that list, adding or
+    removing tags as necessary. Submitting an empty list for an entity
+    will remove all tags for that entity by the user.
     """
-    query = mbxml.make_tag_request(artist_tags, recording_tags)
+    for k, v in kwargs.items():
+        for id, tags in v.items():
+            kwargs[k][id] = tags if isinstance(tags, list) else [tags]
+
+    query = mbxml.make_tag_request(**kwargs)
     return _do_mb_post("tag", query)
 
-def submit_ratings(artist_ratings={}, recording_ratings={}):
-    """ Submit user ratings.
-    Artist or recording parameters are of the form:
+def submit_ratings(**kwargs):
+    """Submit user ratings.
+    Takes parameters named e.g. 'artist_ratings', 'recording_ratings', etc.,
+    and of the form:
     {entity_id1: rating, ...}
+
+    Ratings are numbers from 0-100, at intervals of 20 (20 per 'star').
+    Submitting a rating of 0 will remove the user's rating.
     """
-    query = mbxml.make_rating_request(artist_ratings, recording_ratings)
+    query = mbxml.make_rating_request(**kwargs)
     return _do_mb_post("rating", query)
 
 def add_releases_to_collection(collection, releases=[]):
