@@ -349,10 +349,23 @@ class Pandoki(object):
     def Save(self, song):
         Log('def Save ', song, xbmc.LOGDEBUG)
         if (song['title'] == 'Advertisement') or (song.get('saved')) or (not song.get('cached', False)): return
-        if ('(Live' in song['title'].encode('utf-8')) or ('Live)' in song['title'].encode('utf-8')): return
-        if ('Live At The ' in song['album'].encode('utf-8')): return
         if (Val('mode') in ('0', '3')) or ((Val('mode') == '2') and (song.get('voted') != 'up')): return
         if (not self.Tag(song)): return
+
+	# Blocklists
+        Okay = True
+        if (Val('artist_bl') != ""):
+            for xl_item in Val('artist_bl').split(','):
+		if (xl_item.encode('utf-8').strip() in song['artist'].encode('utf-8')): Okay = False
+        if (Val('album_gl') != ""):
+            for xl_item in Val('album_gl').split(','):
+		if (xl_item.encode('utf-8').strip() in song['album'].encode('utf-8')): Okay = False
+        if (Val('title_gl') != ""):
+            for xl_item in Val('title_gl').split(','):
+		if (xl_item.encode('utf-8').strip() in song['title'].encode('utf-8')): Okay = False
+        if not Okay:
+            xbmcvfs.delete(song['path_cch'])	# Normally deleted from cache after playing
+            return
 
         tmp = "%s.%s" % (song['path'], song['encoding'])
         if not xbmcvfs.copy(song['path_cch'], tmp):
@@ -424,17 +437,33 @@ class Pandoki(object):
                 song['qued'] = True
                 self.Msg('Skipping Advertisements')
 
-        if (not song.get('qued')):
-            if ('(Live' in song['title'].encode('utf-8')) or ('Live)' in song['title'].encode('utf-8')):
-                self.pithos.set_tired(song['token'])
-                notification('Tired', song['title'].encode('utf-8'), '3000', iconart)
-                Log('Tired', song, xbmc.LOGNOTICE)
-                song['qued'] = True
-            elif ('Live At The ' in song['album'].encode('utf-8')):
-                self.pithos.set_tired(song['token'])
-                notification('Tired', song['album'].encode('utf-8'), '3000', iconart)
-                Log('Tired (album)', song, xbmc.LOGNOTICE)
-                song['qued'] = True
+        # Blocklists
+        if (not song.get('qued')) and (Val('artist_bl') != ""):
+            for xl_item in Val('artist_bl').split(','):
+                if (xl_item.encode('utf-8').strip() in song['artist'].encode('utf-8')):
+                    self.pithos.add_feedback(song['token'], False)	# Thumbs down
+                    notification('Banned', song['artist'].encode('utf-8'), '3000', iconart)
+                    Log('Artist blocklist: %s' % song['artist'].encode('utf-8'))
+                    song['qued'] = True
+                    break
+
+        if (not song.get('qued')) and (Val('album_gl') != ""):
+            for xl_item in Val('album_gl').split(','):
+                if (xl_item.encode('utf-8').strip() in song['album'].encode('utf-8')):
+                    self.pithos.set_tired(song['token'])
+                    notification('Tired', song['album'].encode('utf-8'), '3000', iconart)
+                    Log('Album greylist: %s - %s' % (song['artist'].encode('utf-8'), song['album'].encode('utf-8')))
+                    song['qued'] = True
+                    break
+
+        if (not song.get('qued')) and (Val('title_gl') != ""):
+            for xl_item in Val('title_gl').split(','):
+                if (xl_item.encode('utf-8').strip() in song['title'].encode('utf-8')):
+                    self.pithos.set_tired(song['token'])
+                    notification('Tired', song['title'].encode('utf-8'), '3000', iconart)
+                    Log('Title greylist: %s - %s' % (song['artist'].encode('utf-8'), song['title'].encode('utf-8')))
+                    song['qued'] = True
+                    break
 
         Log('Cache QU: ready=%s size=%8d bitrate:%8d' % (song.get('ready'), size, song['bitrate']), song, xbmc.LOGDEBUG)
         if song.get('ready',False) and (not song.get('qued')) and (size >= (song['bitrate'] / 8 * 1024 * int(Val('delay')))):

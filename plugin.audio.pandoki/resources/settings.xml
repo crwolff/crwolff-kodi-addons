@@ -29,6 +29,11 @@
 		<setting id="m3u"        type="bool"   label="Save Playlist"    default="false" visible="!eq(-2,0)"/>
 		<setting id="skip"       type="bool"   label="Skip Ads"         default="false" visible="!eq(-3,0)"/>
 	</category>
+	<category                                      label="Greylist">
+		<setting id="artist_bl"  type="text"   label="Ignored Artists (comma sep.)"     default=""/>
+		<setting id="album_gl"   type="text"   label="Tired Albums (comma sep.)"        default=""/>
+		<setting id="title_gl"   type="text"   label="Tired Songs (comma sep.)"         default=""/>
+	</category>
 	<category                                      label="Advanced">
 		<setting id="history"    type="slider" label="Playlist History" default="14"    range="0,1,50"     option="int"/>
 		<setting id="adsize"     type="slider" label="Advert Size"      default="272"   range="8,8,1024"   option="int" help="This is help"/>

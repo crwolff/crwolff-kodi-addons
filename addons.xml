@@ -2,7 +2,7 @@
 <addons>
 <addon id="plugin.audio.pandoki"
 	name="Pandoki"
-	version="0.9.6"
+	version="0.9.7"
 	provider-name="gominoa, rocky4546, crwolff">
 	<requires>
 		<import addon="xbmc.python" version="2.25.0"/>
