@@ -1,4 +1,9 @@
-import collections, re, socket, sys, threading, time, urllib, urllib2, os
+from future import standard_library
+standard_library.install_aliases()
+from builtins import str
+from builtins import range
+from builtins import object
+import collections, re, socket, sys, threading, time, urllib.request, urllib.parse, urllib.error, urllib.request, urllib.error, urllib.parse, os
 import xbmc, xbmcaddon, xbmcgui, xbmcplugin, xbmcvfs
 import asciidamnit, musicbrainzngs, mypithos
 
@@ -101,14 +106,14 @@ class Pandoki(object):
         proxy = Val('proxy')
 
         if proxy == '1':	# None
-            hand = urllib2.ProxyHandler({})
-            return urllib2.build_opener(hand)
+            hand = urllib.request.ProxyHandler({})
+            return urllib.request.build_opener(hand)
 
         elif proxy == '0':	# Global
             if (Val('sni') == 'true') and _urllib3:
                 return urllib3.PoolManager()
             else:
-                return urllib2.build_opener()
+                return urllib.request.build_opener()
 
         elif proxy == '2':	# Custom
             http = "http://%s:%s@%s:%s" % (Val('proxy_user'), Val('proxy_pass'), Val('proxy_host'), Val('proxy_port'))
@@ -116,8 +121,8 @@ class Pandoki(object):
             if (Val('sni') == 'true') and _urllib3:
                 return urllib3.ProxyManager(http)
             else:
-                hand = urllib2.ProxyHandler({ 'http' : http, 'https' : http })
-                return urllib2.build_opener(hand)
+                hand = urllib.request.ProxyHandler({ 'http' : http, 'https' : http })
+                return urllib.request.build_opener(hand)
 
 
     def Auth(self):
@@ -205,15 +210,15 @@ class Pandoki(object):
             li.setThumbnailImage(art)
 
             title = asciidamnit.asciiDammit(s['title'])
-            rurl = "RunPlugin(plugin://%s/?%s)" % (_id, urllib.urlencode({ 'rename' : s['token'], 'title' : title }))
-            durl = "RunPlugin(plugin://%s/?%s)" % (_id, urllib.urlencode({ 'delete' : s['token'], 'title' : title }))
-            surl = "RunPlugin(plugin://%s/?%s)" % (_id, urllib.urlencode({  'thumb' : s['token'], 'title' : title }))
+            rurl = "RunPlugin(plugin://%s/?%s)" % (_id, urllib.parse.urlencode({ 'rename' : s['token'], 'title' : title }))
+            durl = "RunPlugin(plugin://%s/?%s)" % (_id, urllib.parse.urlencode({ 'delete' : s['token'], 'title' : title }))
+            surl = "RunPlugin(plugin://%s/?%s)" % (_id, urllib.parse.urlencode({  'thumb' : s['token'], 'title' : title }))
 
             li.addContextMenuItems([('Rename Station', rurl),
                                     ('Delete Station', durl),
                                     ('Select Thumb',   surl), ])
 
-            burl = "%s?%s" % (_base, urllib.urlencode({ 'play' : s['token'] }))
+            burl = "%s?%s" % (_base, urllib.parse.urlencode({ 'play' : s['token'] }))
             xbmcplugin.addDirectoryItem(int(handle), burl, li)
 #            Log(burl)
 

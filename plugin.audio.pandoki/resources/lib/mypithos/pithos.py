@@ -15,14 +15,22 @@
 #with this program.  If not, see <http://www.gnu.org/licenses/>.
 ### END LICENSE
 
-from blowfish import Blowfish
+from __future__ import absolute_import
+from future import standard_library
+standard_library.install_aliases()
+from builtins import str
+from builtins import range
+from builtins import object
+
+from .blowfish import Blowfish
 from xml.dom import minidom
 import re
 import json
 import logging
 import time
-import urllib
-import urllib2
+import codecs
+import urllib.request, urllib.parse, urllib.error
+import urllib.request, urllib.error, urllib.parse
 #import ssl
 
 
@@ -89,18 +97,18 @@ def pad(s, l):
 
 class Pithos(object):
     def __init__(self):
-        self.opener = urllib2.build_opener()
+        self.opener = urllib.request.build_opener()
         self.stations = []
         self.sni = False
         pass
 
 
     def pandora_encrypt(self, s):
-        return "".join([self.blowfish_encode.encrypt(pad(s[i:i+8], 8)).encode('hex') for i in xrange(0, len(s), 8)])
+        return "".join([codecs.encode(self.blowfish_encode.encrypt(pad(s[i:i+8], 8)), 'hex_codec') for i in range(0, len(s), 8)])
 
 
     def pandora_decrypt(self, s):
-        return "".join([self.blowfish_decode.decrypt(pad(s[i:i+16].decode('hex'), 8)) for i in xrange(0, len(s), 16)]).rstrip('\x08')
+        return "".join([self.blowfish_decode.decrypt(pad(s[i:i+16].decode('hex'), 8)) for i in range(0, len(s), 16)]).rstrip('\x08')
 
 
     def json_call(self, method, args={}, https=False, blowfish=True):
@@ -110,9 +118,9 @@ class Pithos(object):
         if self.userId:
             url_arg_strings.append('user_id=%s'%self.userId)
         if self.userAuthToken:
-            url_arg_strings.append('auth_token=%s'%urllib.quote_plus(self.userAuthToken))
+            url_arg_strings.append('auth_token=%s'%urllib.parse.quote_plus(self.userAuthToken))
         elif self.partnerAuthToken:
-            url_arg_strings.append('auth_token=%s'%urllib.quote_plus(self.partnerAuthToken))
+            url_arg_strings.append('auth_token=%s'%urllib.parse.quote_plus(self.partnerAuthToken))
 
         url_arg_strings.append('method=%s'%method)
         protocol = 'https' if https else 'http'
@@ -141,13 +149,13 @@ class Pithos(object):
                 raise PithosNetError('urllib3 error')
         else:
             try:
-                req = urllib2.Request(url, data, {'User-agent': USER_AGENT, 'Content-type': 'text/plain'})
+                req = urllib.request.Request(url, data, {'User-agent': USER_AGENT, 'Content-type': 'text/plain'})
                 response = self.opener.open(req, timeout=HTTP_TIMEOUT)
                 text = response.read()
-            except urllib2.HTTPError as e:
+            except urllib.error.HTTPError as e:
                 logging.error("HTTP error: %s", e)
                 raise PithosNetError(str(e))
-            except urllib2.URLError as e:
+            except urllib.error.URLError as e:
                 logging.error("Network error: %s", e)
                 if e.reason[0] == 'timed out':
                     raise PithosTimeout("Network error", submsg="Timeout")

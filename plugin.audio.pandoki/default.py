@@ -1,4 +1,6 @@
-import os, sys, time, urlparse
+from future import standard_library
+standard_library.install_aliases()
+import os, sys, time, urllib.parse
 import xbmc, xbmcaddon, xbmcgui
 
 path = xbmc.translatePath(xbmcaddon.Addon().getAddonInfo('path').decode('utf-8'))
@@ -17,7 +19,7 @@ def Wait(key, value):
 
 
 handle	= sys.argv[1]
-query	= urlparse.parse_qs(sys.argv[2][1:])
+query	= urllib.parse.parse_qs(sys.argv[2][1:])
 
 search	= query.get('search')[0] if query.get('search')	else None
 create	= query.get('create')[0] if query.get('create')	else None
