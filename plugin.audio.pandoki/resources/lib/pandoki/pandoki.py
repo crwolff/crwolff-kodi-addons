@@ -1,11 +1,12 @@
+from __future__ import unicode_literals
 from future import standard_library
 standard_library.install_aliases()
 from builtins import str
 from builtins import range
 from builtins import object
-import collections, re, socket, sys, threading, time, urllib.request, urllib.parse, urllib.error, urllib.request, urllib.error, urllib.parse, os
+import collections, re, socket, sys, threading, time, urllib.request, urllib.parse, urllib.error, urllib.request, urllib.error, urllib.parse, os, unicodedata
 import xbmc, xbmcaddon, xbmcgui, xbmcplugin, xbmcvfs
-import asciidamnit, musicbrainzngs, mypithos
+import musicbrainzngs, mypithos
 
 try:
     import urllib3
@@ -37,18 +38,23 @@ _stamp	= str(time.time())
 # xbmc.LOGWARNING = 3
 
 def Log(msg, s = None, level = xbmc.LOGNOTICE):
-    if s and s.get('artist'): xbmc.log("%s %s %s '%s - %s'" % (_id, msg, s['token'][-4:], s['artist'].encode('ascii','replace'), s['title'].encode('ascii','replace')), level) # song
-    elif s:                   xbmc.log("%s %s %s '%s'"      % (_id, msg, s['token'][-4:], s['title'].encode('ascii','replace')), level)              # station
+    if s and s.get('artist'): xbmc.log("%s %s %s '%s - %s'" % (_id, msg, s['token'][-4:], s['artist'], s['title']), level) # song
+    elif s:                   xbmc.log("%s %s %s '%s'"      % (_id, msg, s['token'][-4:], s['title']), level)              # station
     else:                     xbmc.log("%s %s"              % (_id, msg), level)
 
 # setup the ability to provide notification to the Kodi GUI
 iconart = xbmc.translatePath(os.path.join('special://home/addons/plugin.audio.pandoki',  'icon.png'))
 
 def notification(title, message, ms, nart):
-    message = message.replace(',', ';')		# bad character
-    message = message.replace('"', '\\"')	# bad character
-    xbmc.executebuiltin("XBMC.notification(" + title + "," + message + "," + ms + "," + nart + ")")
+    xbmcgui.Dialog().notification( title, message, icon=nart, time=ms )
 
+def slugify(value):
+    """
+    Normalizes string
+    """
+    value = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore').decode('utf-8')
+    value = re.sub('[\\/?%*:|"<>.]', '', value)		# remove bad filename chars
+    return value
 
 def Val(key, val = None):
     if key in [ 'author', 'changelog', 'description', 'disclaimer', 'fanart', 'icon', 'id', 'name', 'path', 'profile', 'stars', 'summary', 'type', 'version' ]:
@@ -95,8 +101,13 @@ class Pandoki(object):
         self.silent	= xbmc.translatePath("special://home/addons/%s/resources/media/silent.m4a" % _id)
 
         musicbrainzngs.set_useragent("kodi.%s" % _id, Val('version'))
-        xbmcvfs.mkdirs(xbmc.translatePath(Val('cache')).decode("utf-8"))
-        xbmcvfs.mkdirs(xbmc.translatePath(Val('library')).decode("utf-8"))
+        try:
+            xbmcvfs.mkdirs(xbmc.translatePath(Val('cache')).decode("utf-8"))
+            xbmcvfs.mkdirs(xbmc.translatePath(Val('library')).decode("utf-8"))
+        except AttributeError:
+            xbmcvfs.mkdirs(xbmc.translatePath(Val('cache')))
+            xbmcvfs.mkdirs(xbmc.translatePath(Val('library')))
+
 
         # Clean cache at startup
         self.Flush()
@@ -195,8 +206,7 @@ class Pandoki(object):
 
         ic = Val('icon')
         li = xbmcgui.ListItem('New Station ...')
-        li.setIconImage(ic)
-        li.setThumbnailImage(ic)
+        li.setArt({'icon':ic,'thumb':ic})
         xbmcplugin.addDirectoryItem(int(handle), "%s?search=hcraes" % _base, li, True)
 
         for s in self.Sorted():
@@ -206,10 +216,9 @@ class Pandoki(object):
             art = Val("art-%s" % s['token'])
             if not art: art = s.get('art', ic)
 
-            li.setIconImage(art)
-            li.setThumbnailImage(art)
+            li.setArt({'icon':art,'thumb':art})
 
-            title = asciidamnit.asciiDammit(s['title'])
+            title = slugify(s['title'])
             rurl = "RunPlugin(plugin://%s/?%s)" % (_id, urllib.parse.urlencode({ 'rename' : s['token'], 'title' : title }))
             durl = "RunPlugin(plugin://%s/?%s)" % (_id, urllib.parse.urlencode({ 'delete' : s['token'], 'title' : title }))
             surl = "RunPlugin(plugin://%s/?%s)" % (_id, urllib.parse.urlencode({  'thumb' : s['token'], 'title' : title }))
@@ -259,7 +268,8 @@ class Pandoki(object):
             self.songs[song['token']] = song
 
         # This line adds the line in the playlist on Kodi GUI
-        li = xbmcgui.ListItem(song['artist'], song['title'], song['art'], song['art'])
+        li = xbmcgui.ListItem(song['artist'], song['title'])
+        li.setArt({'icon':song['art'],'thumb':song['art']})
         li.setProperty("%s.token" % _id, song['token'])
         li.setInfo('music', self.Info(song))
 
@@ -347,22 +357,26 @@ class Pandoki(object):
 
 
     def Save(self, song):
+        import json
+        with open('songs.json', 'a') as fp:
+            json.dump(song, fp, indent=4)
+            fp.write('\n...\n')
         Log('def Save ', song, xbmc.LOGDEBUG)
         if (song['title'] == 'Advertisement') or (song.get('saved')) or (not song.get('cached', False)): return
         if (Val('mode') in ('0', '3')) or ((Val('mode') == '2') and (song.get('voted') != 'up')): return
         if (not self.Tag(song)): return
 
-	# Blocklists
+        # Blocklists
         Okay = True
         if (Val('artist_bl') != ""):
             for xl_item in Val('artist_bl').split(','):
-		if (xl_item.encode('utf-8').strip() in song['artist'].encode('utf-8')): Okay = False
+                if (xl_item.strip() in song['artist']): Okay = False
         if (Val('album_gl') != ""):
             for xl_item in Val('album_gl').split(','):
-		if (xl_item.encode('utf-8').strip() in song['album'].encode('utf-8')): Okay = False
+                if (xl_item.strip() in song['album']): Okay = False
         if (Val('title_gl') != ""):
             for xl_item in Val('title_gl').split(','):
-		if (xl_item.encode('utf-8').strip() in song['title'].encode('utf-8')): Okay = False
+                if (xl_item.strip() in song['title']): Okay = False
         if not Okay:
             xbmcvfs.delete(song['path_cch'])	# Normally deleted from cache after playing
             return
@@ -412,7 +426,7 @@ class Pandoki(object):
             for jpg in [ song['path_alb'], song['path_art'] ]:
                 if not xbmcvfs.exists(jpg):
                     file = xbmcvfs.File(jpg, 'wb')
-                    file.write(data)
+                    file.write(bytearray(data))
                     file.close()
 
         Log('Save  OK', song, xbmc.LOGINFO)
@@ -440,28 +454,28 @@ class Pandoki(object):
         # Blocklists
         if (not song.get('qued')) and (Val('artist_bl') != ""):
             for xl_item in Val('artist_bl').split(','):
-                if (xl_item.encode('utf-8').strip() in song['artist'].encode('utf-8')):
+                if (xl_item.strip() in song['artist']):
                     self.pithos.add_feedback(song['token'], False)	# Thumbs down
-                    notification('Banned', song['artist'].encode('utf-8'), '3000', iconart)
-                    Log('Artist blocklist: %s' % song['artist'].encode('utf-8'))
+                    notification('Banned', song['artist'], 3000, iconart)
+                    Log('Artist blocklist: %s' % song['artist'])
                     song['qued'] = True
                     break
 
         if (not song.get('qued')) and (Val('album_gl') != ""):
             for xl_item in Val('album_gl').split(','):
-                if (xl_item.encode('utf-8').strip() in song['album'].encode('utf-8')):
+                if (xl_item.strip() in song['album']):
                     self.pithos.set_tired(song['token'])
-                    notification('Tired', song['album'].encode('utf-8'), '3000', iconart)
-                    Log('Album greylist: %s - %s' % (song['artist'].encode('utf-8'), song['album'].encode('utf-8')))
+                    notification('Tired', song['album'], 3000, iconart)
+                    Log('Album greylist: %s - %s' % (song['artist'], song['album']))
                     song['qued'] = True
                     break
 
         if (not song.get('qued')) and (Val('title_gl') != ""):
             for xl_item in Val('title_gl').split(','):
-                if (xl_item.encode('utf-8').strip() in song['title'].encode('utf-8')):
+                if (xl_item.strip() in song['title']):
                     self.pithos.set_tired(song['token'])
-                    notification('Tired', song['title'].encode('utf-8'), '3000', iconart)
-                    Log('Title greylist: %s - %s' % (song['artist'].encode('utf-8'), song['title'].encode('utf-8')))
+                    notification('Tired', song['title'], 3000, iconart)
+                    Log('Title greylist: %s - %s' % (song['artist'], song['title']))
                     song['qued'] = True
                     break
 
@@ -474,6 +488,7 @@ class Pandoki(object):
 
 
     def Cache(self, song):
+        monitor = xbmc.Monitor()
         Log('def Cache ', song, xbmc.LOGDEBUG)
         try:
             strm = self.Proxy().open(song['url'], timeout = 10)
@@ -498,8 +513,8 @@ class Pandoki(object):
         song['starttime'] = time.time()
         lastnotify = time.time()
         if (not song.get('qued')):
-            notification('Caching', '[COLOR lime]' + song['title'].encode('utf-8') + ' [/COLOR]' , '3000', iconart)
-        while (cont) and (size < totl) and (not xbmc.abortRequested) and (not self.abort):
+            notification('Caching', '[COLOR lime]' + song['title'] + ' [/COLOR]' , 3000, iconart)
+        while (cont) and (size < totl) and (not monitor.abortRequested()) and (not self.abort):
             Log("Downloading %8d bytes, currently %8d bytes " % (totl, size), song, xbmc.LOGDEBUG)
             try: data = strm.read(min(8192, totl - size))
             except socket.timeout:
@@ -507,18 +522,18 @@ class Pandoki(object):
                 song['ready'] = True
                 break
 
-            file.write(data)
+            file.write(bytearray(data))
             size += len(data)
 
             if ( lastnotify + 60 < time.time() ):
                 if (size == lastsize):
                     Log('Aborting Song, Song Stopped Buffering: %d out of %d downloaded' % (size, totl), song)
-                    notification('Song Stopped Buffering', '[COLOR lime] %d' % (size * 100 / totl ) + '% ' + song['title'].encode('utf-8') + ' [/COLOR]' , '5000', iconart)
+                    notification('Song Stopped Buffering', '[COLOR lime] %d' % (size * 100 / totl ) + '% ' + song['title'] + ' [/COLOR]' , 5000, iconart)
                     break
 
                 lastnotify = time.time()
                 lastsize = size
-                notification('Song Buffering', '[COLOR lime] %d' % (size * 100 / totl ) + '% ' + song['title'].encode('utf-8') + ' [/COLOR]' , '5000', iconart)
+                notification('Song Buffering', '[COLOR lime] %d' % (size * 100 / totl ) + '% ' + song['title'] + ' [/COLOR]' , 5000, iconart)
 
 
             if ( size >= totl ):
@@ -620,30 +635,30 @@ class Pandoki(object):
 
         elif (mode == 'up'):
             song['voted'] = 'up'
-	    Prop('voted', 'up')
+            Prop('voted', 'up')
             self.pithos.add_feedback(song['token'], True)
-            notification('Thumb UP', song['title'].encode('utf-8'), '3000', iconart)
+            notification('Thumb UP', song['title'], 3000, iconart)
             self.Save(song)
 
         elif (mode == 'tired'):
             self.player.playnext()
             self.pithos.set_tired(song['token'])
-            notification('Tired', song['title'].encode('utf-8'), '3000', iconart)
+            notification('Tired', song['title'], 3000, iconart)
 
         elif (mode == 'down'):
             song['voted'] = 'down'
-	    Prop('voted', 'down')
+            Prop('voted', 'down')
             self.player.playnext()
             self.pithos.add_feedback(song['token'], False)
-            notification('Thumb DOWN', song['title'].encode('utf-8'), '3000', iconart)
+            notification('Thumb DOWN', song['title'], 3000, iconart)
             self.M3U(song, True)
 
         elif (mode == 'clear'):
             song['voted'] = ''
-	    Prop('voted', '')
+            Prop('voted', '')
             feedback = self.pithos.add_feedback(song['token'], True)
             self.pithos.del_feedback(song['station'], feedback)
-            notification('Thumb CLEARED', song['title'].encode('utf-8'), '3000', iconart)
+            notification('Thumb CLEARED', song['title'], 3000, iconart)
 
         else: return
 
@@ -662,7 +677,7 @@ class Pandoki(object):
                 self.Branch(song)
             else:
                 self.pithos.add_feedback(song['token'], True)
-                notification('Thumb UP', song['title'].encode('utf-8'), '3000', iconart)
+                notification('Thumb UP', song['title'], 3000, iconart)
             self.Save(song)
 
         elif (rating == '4'):
@@ -670,12 +685,12 @@ class Pandoki(object):
                 self.Seed(song)
             else:
                 self.pithos.add_feedback(song['token'], True)
-                notification('Thumb UP', song['title'].encode('utf-8'), '3000', iconart)
+                notification('Thumb UP', song['title'], 3000, iconart)
             self.Save(song)
 
         elif (rating == '3'):
             self.pithos.add_feedback(song['token'], True)
-            notification('Thumb UP', song['title'].encode('utf-8'), '3000', iconart)
+            notification('Thumb UP', song['title'], 3000, iconart)
             self.Save(song)
 
         elif (rating == '2'):
@@ -683,18 +698,18 @@ class Pandoki(object):
                 self.pithos.set_tired(song['token'])
             else:
                 self.pithos.add_feedback(song['token'], False)
-                notification('Thumb DOWN', song['title'].encode('utf-8'), '3000', iconart)
+                notification('Thumb DOWN', song['title'], 3000, iconart)
             self.player.playnext()
 
         elif (rating == '1'):
             self.pithos.add_feedback(song['token'], False)
-            notification('Thumb DOWN', song['title'].encode('utf-8'), '3000', iconart)
+            notification('Thumb DOWN', song['title'], 3000, iconart)
             self.player.playnext()
 
         elif (rating == ''):
             feedback = self.pithos.add_feedback(song['token'], True)
             self.pithos.del_feedback(song['station'], feedback)
-            notification('Thumb CLEARED', song['title'].encode('utf-8'), '3000', iconart)
+            notification('Thumb CLEARED', song['title'], 3000, iconart)
 
 
     def Scan(self, rate = False):
@@ -729,21 +744,19 @@ class Pandoki(object):
     def Path(self, s):
         Log('def Path ', None, xbmc.LOGDEBUG)
         lib  = Val('library')
-        badc = '\\/?%*:|"<>.'		# remove bad filename chars
 
-        artist = ''.join(c for c in asciidamnit.asciiDammit(s['artist']).replace('"',"'") if c not in badc)
-        album = ''.join(c for c in asciidamnit.asciiDammit(s['album']).replace('"',"'") if c not in badc)
-        title = ''.join(c for c in asciidamnit.asciiDammit(s['title']).replace('"',"'") if c not in badc)
-
+        artist = slugify(s['artist'])
+        album = slugify(s['album'])
+        title = slugify(s['title'])
         s['path_cch'] = xbmc.translatePath("%s/%s - %s.%s"            % (Val('cache'), artist, title,  s['encoding']))
         s['path_dir'] = xbmc.translatePath("%s/%s/%s - %s"            % (lib,          artist, artist, album))
-        s['path_m4a'] = xbmc.translatePath("%s/%s/%s - %s/%s - %s.%s" % (lib,          artist, artist, album, artist, title, 'm4a')) #s['encoding'])))
-        s['path_mp3'] = xbmc.translatePath("%s/%s/%s - %s/%s - %s.%s" % (lib,          artist, artist, album, artist, title, 'mp3')) #s['encoding'])))
+        s['path_m4a'] = xbmc.translatePath("%s/%s/%s - %s/%s - %s.%s" % (lib,          artist, artist, album, artist, title, 'm4a'))
+        s['path_mp3'] = xbmc.translatePath("%s/%s/%s - %s/%s - %s.%s" % (lib,          artist, artist, album, artist, title, 'mp3'))
         s['path_lib'] = xbmc.translatePath("%s/%s/%s - %s/%s - %s.%s" % (lib,          artist, artist, album, artist, title, s['encoding']))
         s['path_alb'] = xbmc.translatePath("%s/%s/%s - %s/folder.jpg" % (lib,          artist, artist, album))
-        s['path_art'] = xbmc.translatePath("%s/%s/folder.jpg"         % (lib,          artist)) #.decode("utf-8")
+        s['path_art'] = xbmc.translatePath("%s/%s/folder.jpg"         % (lib,          artist))
 
-        title = ''.join(c for c in asciidamnit.asciiDammit(self.station['title']).replace('"',"'") if c not in badc)
+        title = slugify(self.station['title'])
         s['path_m3u'] = xbmc.translatePath("%s/%s.m3u"                % (lib, title))
         s['path_rel'] = xbmc.translatePath("%s/%s - %s/%s - %s.%s"    % (     artist, artist, album, artist, title, s['encoding']))
 
@@ -951,7 +964,10 @@ class Pandoki(object):
 
     def Flush(self):
         Log('def Flush', None, level = xbmc.LOGDEBUG)
-        cch = xbmc.translatePath(Val('cache')).decode("utf-8")
+        try:
+            cch = xbmc.translatePath(Val('cache')).decode("utf-8")
+        except AttributeError:
+            cch = xbmc.translatePath(Val('cache'))
         reg = re.compile('^.*\.(m4a|mp3)')
 
         (dirs, list) = xbmcvfs.listdir(cch)
@@ -963,8 +979,9 @@ class Pandoki(object):
 
 
     def Loop(self):
+        monitor = xbmc.Monitor()
         Log('def Loop', None, level = xbmc.LOGDEBUG)
-        while (not xbmc.abortRequested) and (not self.abort) and (self.once or self.player.isPlayingAudio()):
+        while (not monitor.abortRequested()) and (not self.abort) and (self.once or self.player.isPlayingAudio()):
             time.sleep(0.01)
             xbmc.sleep(3000)
 
@@ -980,7 +997,7 @@ class Pandoki(object):
                     break
 
         if (self.player.isPlayingAudio()):
-            notification('Exiting', '[COLOR lime]No longer queuing new songs[/COLOR]' , '5000', iconart)
-        Log('Pankodi Exiting XBMCAbort?=%s PandokiAbort?=%s ' % (xbmc.abortRequested, self.abort), None, level = xbmc.LOGNOTICE)
+            notification('Exiting', '[COLOR lime]No longer queuing new songs[/COLOR]' , 5000, iconart)
+        Log('Pankodi Exiting XBMCAbort?=%s PandokiAbort?=%s ' % (monitor.abortRequested(), self.abort), None, level = xbmc.LOGNOTICE)
         Prop('run', '0')
 

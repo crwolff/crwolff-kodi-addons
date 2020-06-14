@@ -3,7 +3,10 @@ standard_library.install_aliases()
 import os, sys, time, urllib.parse
 import xbmc, xbmcaddon, xbmcgui
 
-path = xbmc.translatePath(xbmcaddon.Addon().getAddonInfo('path').decode('utf-8'))
+try:
+    path = xbmc.translatePath(xbmcaddon.Addon().getAddonInfo('path').decode('utf-8'))
+except AttributeError:
+    path = xbmc.translatePath(xbmcaddon.Addon().getAddonInfo('path'))
 path = xbmc.translatePath(os.path.join(path, 'resources', 'lib'))
 sys.path.append(path)
 

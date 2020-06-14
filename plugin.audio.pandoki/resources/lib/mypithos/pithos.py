@@ -92,7 +92,7 @@ _client = {
 
 
 def pad(s, l):
-    return s + "\0" * (l - len(s))
+    return s + b'\0' * (l - len(s))
 
 
 class Pithos(object):
@@ -104,11 +104,11 @@ class Pithos(object):
 
 
     def pandora_encrypt(self, s):
-        return "".join([codecs.encode(self.blowfish_encode.encrypt(pad(s[i:i+8], 8)), 'hex_codec') for i in range(0, len(s), 8)])
+        return b''.join([codecs.encode(self.blowfish_encode.encrypt(pad(s[i:i+8], 8)), 'hex_codec') for i in range(0, len(s), 8)])
 
 
     def pandora_decrypt(self, s):
-        return "".join([self.blowfish_decode.decrypt(pad(s[i:i+16].decode('hex'), 8)) for i in range(0, len(s), 16)]).rstrip('\x08')
+        return b''.join([self.blowfish_decode.decrypt(pad(codecs.decode(s[i:i+16], 'hex_codec'), 8)) for i in range(0, len(s), 16)]).rstrip(b'\x08')
 
 
     def json_call(self, method, args={}, https=False, blowfish=True):
@@ -132,7 +132,7 @@ class Pithos(object):
             args['userAuthToken'] = self.userAuthToken
         elif self.partnerAuthToken:
             args['partnerAuthToken'] = self.partnerAuthToken
-        data = json.dumps(args)
+        data = json.dumps(args).encode('utf-8')
 
         logging.debug(url)
         logging.debug(data)
@@ -151,7 +151,7 @@ class Pithos(object):
             try:
                 req = urllib.request.Request(url, data, {'User-agent': USER_AGENT, 'Content-type': 'text/plain'})
                 response = self.opener.open(req, timeout=HTTP_TIMEOUT)
-                text = response.read()
+                text = response.read().decode('utf-8')
             except urllib.error.HTTPError as e:
                 logging.error("HTTP error: %s", e)
                 raise PithosNetError(str(e))
@@ -213,8 +213,8 @@ class Pithos(object):
 
         client = _client[one]
         self.rpcUrl = client['rpcUrl']
-        self.blowfish_encode = Blowfish(client['encryptKey'])
-        self.blowfish_decode = Blowfish(client['decryptKey'])
+        self.blowfish_encode = Blowfish(client['encryptKey'].encode('utf-8'))
+        self.blowfish_decode = Blowfish(client['decryptKey'].encode('utf-8'))
 
         partner = self.json_call('auth.partnerLogin', {
             'deviceModel': client['deviceModel'],
@@ -226,7 +226,7 @@ class Pithos(object):
         self.partnerId = partner['partnerId']
         self.partnerAuthToken = partner['partnerAuthToken']
 
-        pandora_time = int(self.pandora_decrypt(partner['syncTime'])[4:14])
+        pandora_time = int(self.pandora_decrypt(partner['syncTime'].encode('utf-8'))[4:14])
         self.time_offset = pandora_time - time.time()
         logging.info("Time offset is %s", self.time_offset)
 
