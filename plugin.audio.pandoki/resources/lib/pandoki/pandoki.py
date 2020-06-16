@@ -843,8 +843,7 @@ class Pandoki(object):
             Log('def Deque setting once to False', None, xbmc.LOGDEBUG)
             self.once = False
 
-        max = int(Val('history'))
-        while (self.playlist.size() > max) and (self.playlist.getposition() > 0):
+        for x in range(min( self.playlist.size() - int(Val('history')), self.playlist.getposition() )):
             xbmc.executeJSONRPC('{"jsonrpc":"2.0", "id":1, "method":"Playlist.Remove", "params":{"playlistid":' + str(xbmc.PLAYLIST_MUSIC) + ', "position":0}}')
             xbmc.sleep(100)
 
