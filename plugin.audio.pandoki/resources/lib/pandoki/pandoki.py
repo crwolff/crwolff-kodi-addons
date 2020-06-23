@@ -38,9 +38,18 @@ _stamp	= str(time.time())
 # xbmc.LOGWARNING = 3
 
 def Log(msg, s = None, level = xbmc.LOGNOTICE):
-    if s and s.get('artist'): xbmc.log("%s %s %s '%s - %s'" % (_id, msg, s['token'][-4:], s['artist'], s['title']), level) # song
-    elif s:                   xbmc.log("%s %s %s '%s'"      % (_id, msg, s['token'][-4:], s['title']), level)              # station
-    else:                     xbmc.log("%s %s"              % (_id, msg), level)
+    try:
+        if s and s.get('artist'): xbmc.log("%s %s %s '%s - %s'" % (_id, msg, s['token'][-4:], s['artist'].encode('ascii','replace'), s['title'].encode('ascii','replace')), level) # song
+        elif s:                   xbmc.log("%s %s %s '%s'"      % (_id, msg, s['token'][-4:], s['title'].encode('ascii','replace')), level)              # station
+        else:                     xbmc.log("%s %s"              % (_id, msg), level)
+    except UnicodeEncodeError:
+        xbmc.log("%s %s (UnicodeEncodeError)" % (_id, msg), level)
+        pass
+#        import json
+#        tpath = xbmc.translatePath('log_errs.json')
+#        with open(tpath, 'a') as fp:
+#            fp.write('\nLog Failure\n')
+#            json.dump(s, fp, indent=4)
 
 # setup the ability to provide notification to the Kodi GUI
 iconart = xbmc.translatePath(os.path.join('special://home/addons/plugin.audio.pandoki',  'icon.png'))
@@ -357,10 +366,6 @@ class Pandoki(object):
 
 
     def Save(self, song):
-        #import json
-        #with open('songs.json', 'a') as fp:
-        #    json.dump(song, fp, indent=4)
-        #    fp.write('\n...\n')
         Log('def Save ', song, xbmc.LOGDEBUG)
         if (song['title'] == 'Advertisement') or (song.get('saved')) or (not song.get('cached', False)): return
         if (Val('mode') in ('0', '3')) or ((Val('mode') == '2') and (song.get('voted') != 'up')): return
@@ -492,6 +497,10 @@ class Pandoki(object):
         Log('def Cache ', song, xbmc.LOGDEBUG)
         try:
             strm = self.Proxy().open(song['url'], timeout = 10)
+        except socket.timeout:
+            Log('Socket Timeout: open: Cache TO', song)
+            self.wait['next'] = time.time() + 60.0	# Wait 1 minute before fetching next
+            return
         except: # HTTPError:
             self.wait['auth'] = 0
             if not self.Auth():
