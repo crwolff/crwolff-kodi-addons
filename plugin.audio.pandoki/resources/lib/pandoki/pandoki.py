@@ -497,16 +497,18 @@ class Pandoki(object):
         Log('def Cache ', song, xbmc.LOGDEBUG)
         try:
             strm = self.Proxy().open(song['url'], timeout = 10)
-        except socket.timeout:
-            Log('Socket Timeout: open: Cache TO', song)
-            self.wait['next'] = time.time() + 60.0	# Wait 1 minute before fetching next
-            return
         except: # HTTPError:
             self.wait['auth'] = 0
             if not self.Auth():
                 Log("Cache ER", song, xbmc.LOGINFO)
                 return
             strm = self.Proxy().open(song['url'], timeout = 10)
+
+        # Handle missing data
+        if strm.headers.get('Content-Length') == None:
+            Log('Cache didn\'t get headers', song )
+            self.wait['next'] = time.time() + 60.0	# Wait 1 minute to allow network to recover
+            return
 
         totl = int(strm.headers['Content-Length'])
         size = 0
