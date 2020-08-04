@@ -523,8 +523,11 @@ class Pandoki(object):
         self.downloading = self.downloading + 1
         song['starttime'] = time.time()
         lastnotify = time.time()
+        title = song['title']
+        short_title = title[:32] if len(title) > 32 else title
         if (not song.get('qued')):
-            notification('Caching', '[COLOR lime]' + song['title'] + ' [/COLOR]' , 3000, iconart)
+            notification('Caching', '[COLOR lime]' + short_title + ' [/COLOR]' , 3000, iconart)
+        short_title = title[:28] if len(title) > 28 else title
         while (cont) and (size < totl) and (not monitor.abortRequested()) and (not self.abort):
             Log("Downloading %8d bytes, currently %8d bytes " % (totl, size), song, xbmc.LOGDEBUG)
             try: data = strm.read(min(8192, totl - size))
@@ -539,12 +542,12 @@ class Pandoki(object):
             if ( lastnotify + 60 < time.time() ):
                 if (size == lastsize):
                     Log('Aborting Song, Song Stopped Buffering: %d out of %d downloaded' % (size, totl), song)
-                    notification('Song Stopped Buffering', '[COLOR lime] %d' % (size * 100 / totl ) + '% ' + song['title'] + ' [/COLOR]' , 5000, iconart)
+                    notification('Song Stopped Buffering', '[COLOR lime] %d' % (size * 100 / totl ) + '% ' + short_title + ' [/COLOR]' , 5000, iconart)
                     break
 
                 lastnotify = time.time()
                 lastsize = size
-                notification('Song Buffering', '[COLOR lime] %d' % (size * 100 / totl ) + '% ' + song['title'] + ' [/COLOR]' , 5000, iconart)
+                notification('Song Buffering', '[COLOR lime] %d' % (size * 100 / totl ) + '% ' + short_title + ' [/COLOR]' , 5000, iconart)
 
 
             if ( size >= totl ):
