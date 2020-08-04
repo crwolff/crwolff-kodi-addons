@@ -43,7 +43,7 @@ def Log(msg, s = None, level = xbmc.LOGNOTICE):
         elif s:                   xbmc.log("%s %s %s '%s'"      % (_id, msg, s['token'][-4:], s['title'].encode('ascii','replace')), level)              # station
         else:                     xbmc.log("%s %s"              % (_id, msg), level)
     except UnicodeEncodeError:
-        xbmc.log("%s %s (UnicodeEncodeError)" % (_id, msg), level)
+        xbmc.log("%s %s (UnicodeEncodeError)" % (_id, slugify(msg)), level)
         pass
 #        import json
 #        tpath = xbmc.translatePath('log_errs.json')
