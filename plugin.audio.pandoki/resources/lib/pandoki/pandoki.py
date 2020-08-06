@@ -39,9 +39,9 @@ _stamp	= str(time.time())
 
 def Log(msg, s = None, level = xbmc.LOGNOTICE):
     try:
-        if s and s.get('artist'): xbmc.log("%s %s %s '%s - %s'" % (_id, msg, s['token'][-4:], s['artist'].encode('ascii','replace'), s['title'].encode('ascii','replace')), level) # song
-        elif s:                   xbmc.log("%s %s %s '%s'"      % (_id, msg, s['token'][-4:], s['title'].encode('ascii','replace')), level)              # station
-        else:                     xbmc.log("%s %s"              % (_id, msg), level)
+        if s and s.get('artist'): xbmc.log(("%s %s %s '%s - %s'" % (_id, msg, s['token'][-4:], s['artist'], s['title'])).encode('ascii','replace'), level) # song
+        elif s:                   xbmc.log(("%s %s %s '%s'"      % (_id, msg, s['token'][-4:], s['title'])).encode('ascii','replace'), level)              # station
+        else:                     xbmc.log(("%s %s"              % (_id, msg)).encode('ascii','replace'), level)
     except UnicodeEncodeError:
         xbmc.log("%s %s (UnicodeEncodeError)" % (_id, slugify(msg)), level)
         pass
