@@ -238,7 +238,7 @@ class Pithos(object):
     def get_stations(self, *ignore):
         self.stations = []
 
-        for s in self.json_call('user.getStationList', { 'includeStationArtUrl' : True })['stations']:
+        for s in self.json_call('user.getStationList', { 'includeStationArtUrl' : True, 'returnAllStations': True })['stations']:
             self.stations.append({ 'id' : s['stationId'], 'token' : s['stationToken'], 'title' : s['stationName'], 'art' : s.get('artUrl') })
         logging.info('get_stations JSON: %s' % s)
         return self.stations
