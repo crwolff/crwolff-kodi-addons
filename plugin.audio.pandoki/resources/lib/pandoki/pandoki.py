@@ -353,10 +353,15 @@ class Pandoki(object):
         Log('def Tag ', song, xbmc.LOGDEBUG)
         try:
             res = musicbrainzngs.search_recordings(limit = 1, query = song['title'], artist = song['artist'], release = song['album'], qdur = str(song['duration'] * 1000))['recording-list'][0]
-            song['number'] = int(res['release-list'][0]['medium-list'][-1]['track-list'][0]['number'])
-            song['count']  =     res['release-list'][0]['medium-list'][-1]['track-count']
             song['score']  =     res['ext:score']
             song['brain']  =     res['id']
+            for lst in res['release-list']:	# Find a numeric track number
+                song['count']  = lst['medium-list'][-1]['track-count']
+                try:
+                    song['number'] = int(lst['medium-list'][-1]['track-list'][0]['number'])
+                    break
+                except ValueError:
+                    song['number'] = 0
 
         except:
             song['score']  = '0'
@@ -369,7 +374,9 @@ class Pandoki(object):
         Log('def Save ', song, xbmc.LOGDEBUG)
         if (song['title'] == 'Advertisement') or (song.get('saved')) or (not song.get('cached', False)): return
         if (Val('mode') in ('0', '3')) or ((Val('mode') == '2') and (song.get('voted') != 'up')): return
-        if (not self.Tag(song)): return
+        if (not self.Tag(song)):
+            Log("Tag failed ", song)
+            return
 
         # Blocklists
         Okay = True
