@@ -62,8 +62,9 @@ def slugify(value):
     Normalizes string
     """
     value = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore').decode('utf-8')
-    value = re.sub('[\\/?%*:|"<>.]', '', value)		# remove bad filename chars
-    return value
+    value = re.sub('[\\/|]', '-', value)
+    value = re.sub('[?%*:<>]', ' ', value)		# remove bad filename chars
+    return ' '.join(value.split())			# collapse multiple spaces
 
 def Val(key, val = None):
     if key in [ 'author', 'changelog', 'description', 'disclaimer', 'fanart', 'icon', 'id', 'name', 'path', 'profile', 'stars', 'summary', 'type', 'version' ]:
